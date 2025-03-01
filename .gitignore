@@ -1,5 +1,10 @@
 # JetBrains IDE
 .idea
 
-# Server folder
-/minecraft_server
+# Server folders & files
+/world
+/backup
+/log
+/fifo
+server.jar
+version.txt

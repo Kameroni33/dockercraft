@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set backup folder
-BACKUP_DIR="/minecraft/backups"
+BACKUP_DIR="/minecraft/backup"
 WORLD_DIR="/minecraft/world"
 TIMESTAMP=$(date +%F-%H-%M-%S)
 BACKUP_FILE="$BACKUP_DIR/world-$TIMESTAMP.tar.gz"

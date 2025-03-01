@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# Set memory limits (adjust as needed)
-MEMORY_MAX="2G"
-MEMORY_MIN="1G"
+cd "$SERVER_PATH" || exit
 
 # Ensure required files exist
 if [ ! -f "server.jar" ]; then
@@ -11,13 +9,12 @@ if [ ! -f "server.jar" ]; then
 fi
 
 # Create a backups folder if it doesn't exist
-mkdir -p backups logs
+mkdir -p "$BACKUP_DIR" "$LOG_DIR"
 
 # Rotate logs (keep last 5 logs)
-mv logs/latest.log logs/latest-$(date +%F-%T).log 2>/dev/null
-ls -tp logs | grep -v '/$' | tail -n +6 | xargs -I {} rm -- "logs/{}"
+mv "$LOG_DIR"/latest.log "$LOG_DIR"/latest-"$(date +%F-%T)".log 2>/dev/null
+ls -tp "$LOG_DIR" | grep -v '/$' | tail -n +6 | xargs -I {} rm -- "logs/{}"
 
 # Start the Minecraft server and listen for commands
 echo "Starting Minecraft server..."
-java -Xms$MEMORY_MIN -Xmx$MEMORY_MAX -jar server.jar nogui < /minecraft/fifo &
-wait
+tail -f "$FIFO_PATH" | java -Xms"$MEMORY_MIN" -Xmx"$MEMORY_MAX" -jar server.jar nogui > >(tee -a "$LOG_DIR/latest.log") 2>&1 & wait

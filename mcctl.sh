@@ -1,14 +1,16 @@
 #!/bin/bash
 
-MC_FIFO="/minecraft/fifo"
-MC_LOG="/minecraft/logs/latest.log"
+# TODO: make dynamic
+MC_FIFO="$HOME/Projects/dockercraft/fifo"
+MC_LOG="$HOME/Projects/dockercraft/log/latest.log"
 
 function send_command() {
   echo "$1" > "$MC_FIFO"
 }
 
 function attach_console() {
-  tail -f "$MC_LOG"
+  local lines=${1:-10}  # Default to 10 if not provided
+  tail -n "$lines" -f "$MC_LOG"
 }
 
 function restart_server() {
@@ -42,7 +44,8 @@ case "$1" in
     send_command "$@"
     ;;
   logs)
-    attach_console
+    shift
+    attach_console "$1"
     ;;
   restart)
     restart_server

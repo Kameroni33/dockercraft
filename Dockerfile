@@ -1,8 +1,7 @@
-FROM debian:bookworm-slim
+FROM openjdk:21-jdk-slim
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
-    openjdk-17-jre-headless \
     cron \
     && rm -rf /var/lib/apt/lists/*
 
@@ -14,6 +13,9 @@ RUN echo "eula=true" > eula.txt
 
 # Expose Minecraft server port
 EXPOSE 25565
+
+# Create Minecraft working directory
+RUN mkdir -p /minecraft
 
 # Copy startup script
 COPY start.sh /start.sh

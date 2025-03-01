@@ -3,16 +3,22 @@ version: "3.8"
 services:
   minecraft:
     build: .
-    container_name: minecraft_server
+    container_name: dockercraft
     ports:
       - "25565:25565"
     volumes:
-      - ./data:/minecraft
+      - ./server.jar:/minecraft/server.jar
       - ./world:/minecraft/world
-      - ./backups:/minecraft/backups
+      - ./backup:/minecraft/backup
+      - ./log:/minecraft/log
+      - ./fifo:/minecraft/fifo
     environment:
-      - MEMORY_MIN=1G
-      - MEMORY_MAX=2G
+      - SERVER_PATH=/minecraft
+      - FIFO_PATH=/minecraft/fifo
+      - BACKUP_DIR=backup
+      - LOG_DIR=log
+      - MEMORY_MIN=2G
+      - MEMORY_MAX=4G
     restart: unless-stopped
     stdin_open: true
     tty: true

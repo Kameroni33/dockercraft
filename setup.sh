@@ -4,8 +4,7 @@ set -e
 
 # Default values
 DEFAULT_VERSION="latest"
-DEFAULT_NAME="minecraft_server"
-MC_DIR="$PWD/minecraft_server"
+DEFAULT_NAME="dockercraft"
 MCCTL_PATH="/usr/local/bin/mcctl"
 JAR_NAME="server.jar"
 
@@ -43,9 +42,8 @@ SERVER_NAME=${SERVER_NAME:-$DEFAULT_NAME}
 read -p "Enter Minecraft version (or 'latest' for newest) [$DEFAULT_VERSION]: " MC_VERSION
 MC_VERSION=${MC_VERSION:-$DEFAULT_VERSION}
 
-# Create server directory
-mkdir -p "$MC_DIR"
-cd "$MC_DIR"
+# Save server version
+echo "$MC_VERSION" > version.txt
 
 # Fetch latest Minecraft version if 'latest' is selected
 if [ "$MC_VERSION" == "latest" ]; then
@@ -54,18 +52,22 @@ if [ "$MC_VERSION" == "latest" ]; then
 fi
 
 # Fetch the download URL of the selected version
-JAR_URL=$(curl -s "$PAPER_VERSIONS_URL" | jq -r '.versions[\"$MC_VERSION]\"')
+JAR_URL=$(curl -s "$PAPER_VERSIONS_URL" | jq -r --arg version "$MC_VERSION" '.versions[$version]')
 
 # Download the selected Minecraft server JAR
 echo "Downloading Minecraft server version $MC_VERSION..."
-curl -o "$MC_DIR/$JAR_NAME" -L "$JAR_URL/$MC_VERSION/builds/latest/downloads/paper-$MC_VERSION.jar"
+curl -o "$JAR_NAME" -L "$JAR_URL"
 
 # Ensure execution permissions
-chmod +x "$MC_DIR/$JAR_NAME"
+chmod +x "$JAR_NAME"
 
 # Install mcctl globally
 chmod +x mcctl.sh
-sudo mv mcctl.sh "$MCCTL_PATH"
+sudo cp mcctl.sh "$MCCTL_PATH"
+
+# Create the server FIFO
+mkfifo ./fifo
+sudo chmod 666 fifo
 
 # Build and start the server
 echo "Building and starting the Minecraft server..."
