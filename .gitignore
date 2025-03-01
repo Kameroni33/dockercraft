@@ -1,3 +1,5 @@
 # JetBrains IDE
 .idea
 
+# Server folder
+/minecraft_server
