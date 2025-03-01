@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  minecraft:
+    build: .
+    container_name: minecraft_server
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/minecraft
+      - ./world:/minecraft/world
+      - ./backups:/minecraft/backups
+    environment:
+      - MEMORY_MIN=1G
+      - MEMORY_MAX=2G
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
