@@ -7,31 +7,32 @@ DEFAULT_VERSION="latest"
 DEFAULT_NAME="minecraft_server"
 MC_DIR="$PWD/minecraft_server"
 MCCTL_PATH="/usr/local/bin/mcctl"
+JAR_NAME="server.jar"
 
-JAR_URL="https://api.papermc.io/v2/projects/paper/versions"
+PAPER_VERSIONS_URL="https://qing762.is-a.dev/api/papermc"
 
 echo "Welcome to the Minecraft Server Setup!"
 
 # Install Docker if not installed
 if ! command -v docker &> /dev/null; then
-    echo "Docker not found. Installing Docker..."
-    sudo apt update
-    sudo apt install -y docker.io
-    sudo systemctl enable --now docker
-    echo "Docker installed successfully."
+  echo "Docker not found. Installing Docker..."
+  sudo apt update
+  sudo apt install -y docker.io
+  sudo systemctl enable --now docker
+  echo "Docker installed successfully."
 fi
 
 # Add current user to Docker group
 if ! groups $USER | grep -q '\bdocker\b'; then
-    echo "Adding $USER to the docker group..."
-    sudo usermod -aG docker $USER
-    echo "Please log out and back in or run 'newgrp docker' for changes to take effect."
+  echo "Adding $USER to the docker group..."
+  sudo usermod -aG docker $USER
+  echo "Please log out and back in or run 'newgrp docker' for changes to take effect."
 fi
 
 # Install Docker Compose if not installed
 if ! command -v docker-compose &> /dev/null; then
-    echo "Installing Docker Compose..."
-    sudo apt install -y docker-compose
+  echo "Installing Docker Compose..."
+  sudo apt install -y docker-compose
 fi
 
 # Prompt for server name
@@ -48,12 +49,14 @@ cd "$MC_DIR"
 
 # Fetch latest Minecraft version if 'latest' is selected
 if [ "$MC_VERSION" == "latest" ]; then
-    MC_VERSION=$(curl -s "$JAR_URL" | jq -r '.versions[-1]')
-    echo "Latest version detected: $MC_VERSION"
+  MC_VERSION=$(curl -s "$PAPER_VERSIONS_URL" | jq -r '.latest')
+  echo "Latest version detected: $MC_VERSION"
 fi
 
+# Fetch the download URL of the selected version
+JAR_URL=$(curl -s "$PAPER_VERSIONS_URL" | jq -r '.versions[\"$MC_VERSION]\"')
+
 # Download the selected Minecraft server JAR
-JAR_NAME="paper-$MC_VERSION.jar"
 echo "Downloading Minecraft server version $MC_VERSION..."
 curl -o "$MC_DIR/$JAR_NAME" -L "$JAR_URL/$MC_VERSION/builds/latest/downloads/paper-$MC_VERSION.jar"
 
