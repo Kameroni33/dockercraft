@@ -2,9 +2,8 @@
 .idea
 
 # Server folders & files
-/world
-/backup
-/log
+/server
+/backups
+/logs
 /fifo
 server.jar
-version.txt

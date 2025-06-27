@@ -42,9 +42,6 @@ SERVER_NAME=${SERVER_NAME:-$DEFAULT_NAME}
 read -p "Enter Minecraft version (or 'latest' for newest) [$DEFAULT_VERSION]: " MC_VERSION
 MC_VERSION=${MC_VERSION:-$DEFAULT_VERSION}
 
-# Save server version
-echo "$MC_VERSION" > version.txt
-
 # Fetch latest Minecraft version if 'latest' is selected
 if [ "$MC_VERSION" == "latest" ]; then
   MC_VERSION=$(curl -s "$PAPER_VERSIONS_URL" | jq -r '.latest')

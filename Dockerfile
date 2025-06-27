@@ -3,6 +3,7 @@ FROM openjdk:21-jdk-slim
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     cron \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -29,7 +30,12 @@ RUN chmod +x /backup.sh
 RUN mkfifo /minecraft/fifo
 
 # Add cron job for daily backups
+RUN echo "0 0 * * * /backup.sh >> /var/log/cron.log 2>&1" | crontab -
 RUN (echo "0 0 * * * /backup.sh") | crontab -
 
+# Copy supervisor config and set entrypoint
+COPY supervisord.conf /etc/supervisor/supervisord.conf
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+
 # Set entrypoint
-ENTRYPOINT ["/start.sh"]
+#ENTRYPOINT ["/start.sh"]

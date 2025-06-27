@@ -8,17 +8,19 @@ services:
       - "25565:25565"
     volumes:
       - ./server.jar:/minecraft/server.jar
-      - ./world:/minecraft/world
-      - ./backup:/minecraft/backup
-      - ./log:/minecraft/log
+      - ./backups:/minecraft/backups
+      - ./logs:/minecraft/logs
       - ./fifo:/minecraft/fifo
+      - ./server:/minecraft
     environment:
       - SERVER_PATH=/minecraft
-      - FIFO_PATH=/minecraft/fifo
-      - BACKUP_DIR=backup
-      - LOG_DIR=log
+      - FIFO_PATH=fifo
+      - BACKUP_DIR=backups
+      - LOG_DIR=logs
       - MEMORY_MIN=2G
       - MEMORY_MAX=4G
+      - MAX_LOGS=10
+      - MAX_BACKUPS=10
     restart: unless-stopped
     stdin_open: true
     tty: true

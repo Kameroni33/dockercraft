@@ -2,8 +2,7 @@
 
 # TODO: make dynamic
 MC_FIFO="$HOME/Projects/dockercraft/fifo"
-MC_LOG="$HOME/Projects/dockercraft/log/latest.log"
-MC_WORLD="$HOME/Projects/dockercraft/world"
+MC_LOG="$HOME/Projects/dockercraft/logs/latest.log"
 
 function send_command() {
   echo "$1" > "$MC_FIFO"
@@ -45,22 +44,6 @@ function stop_server() {
   echo "stop" > "$MC_FIFO"
 }
 
-function delete_world() {
-  echo "WARNING: This will delete the entire Minecraft world folder ($MC_WORLD)!"
-  read -rp "Are you sure? (type 'yes' to confirm): " confirmation
-
-  if [[ "$confirmation" == "yes" ]]; then
-    stop_server
-    sleep 5
-    echo "Deleting world data..."
-    rm -rf "$MC_WORLD"
-    echo "World deleted successfully."
-    restart_server
-  else
-    echo "Operation canceled."
-  fi
-}
-
 function show_help() {
   echo "Usage: $0 {send <command> | logs | restart | stop | -h}"
   echo ""
@@ -70,7 +53,6 @@ function show_help() {
   echo "  attach                   Attach to the Minecraft server console (interactive logs with input)."
   echo "  restart                  Restarts the Minecraft server."
   echo "  stop                     Stops the Minecraft server."
-  echo "  delete                   Delete the current Minecraft world."
   echo "  help                     Shows this help message."
 }
 
@@ -91,9 +73,6 @@ case "$1" in
     ;;
   stop)
     stop_server
-    ;;
-  delete)
-    delete_world
     ;;
   help)
     show_help
