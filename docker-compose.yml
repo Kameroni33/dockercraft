@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  minecraft:
+  dockercraft:
     build: .
     container_name: dockercraft
     ports:
@@ -17,8 +17,8 @@ services:
       - FIFO_PATH=fifo
       - BACKUP_DIR=backups
       - LOG_DIR=logs
-      - MEMORY_MIN=2G
-      - MEMORY_MAX=4G
+      - MEMORY_MIN=4G
+      - MEMORY_MAX=8G
       - MAX_LOGS=10
       - MAX_BACKUPS=10
     restart: unless-stopped

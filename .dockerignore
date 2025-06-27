@@ -1,2 +1,4 @@
-server/backups
-world
+.cache
+backups
+logs
+server

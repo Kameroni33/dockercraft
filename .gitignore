@@ -7,3 +7,6 @@
 /logs
 /fifo
 server.jar
+
+# Cache
+.cache
