@@ -8,6 +8,9 @@ if [ ! -f "server.jar" ]; then
   exit 1
 fi
 
+# Clean up leftover lock or PID files
+rm -f supervisord.pid
+
 # Create a backups folder if it doesn't exist
 mkdir -p "$BACKUP_DIR" "$LOG_DIR"
 

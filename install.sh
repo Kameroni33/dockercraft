@@ -13,7 +13,7 @@ MCUTILS_URL="https://mcutils.com"
 SERVER_NAME="dockercraft"
 SERVER_PATH="./server"
 
-CLEAN_ITEMS=(
+REMOVE=(
   "logs"
   "cache"
   "debug"
@@ -32,6 +32,7 @@ CLEAN_ITEMS=(
   ".fabric"
 )
 
+SEED="" # random
 
 echo "Welcome to the Minecraft Server Installer!"
 
@@ -48,14 +49,14 @@ done
 
 if docker ps --format '{{.Names}}' | grep -q "^${SERVER_NAME}$"; then
   echo "Warning: A minecraft server '$SERVER_NAME' already exists ."
-  read -p "Do you want to delete it and continue? [y/N] " stopit
+  read -p "Do you want to delete it and reset the server? [y/N] " stopit
   if [[ "$stopit" =~ ^[Yy]$ ]]; then
     echo "Stopping container $SERVER_NAME..."
     docker stop "$SERVER_NAME"
     echo "Removing container $SERVER_NAME..."
     docker rm "$SERVER_NAME"
 
-    for item in "${CLEAN_ITEMS[@]}"; do
+    for item in "${REMOVE[@]}"; do
       path="$SERVER_PATH/$item"
       if [ -e "$path" ]; then
         echo "Removing $path..."
@@ -64,8 +65,7 @@ if docker ps --format '{{.Names}}' | grep -q "^${SERVER_NAME}$"; then
     done
 
   else
-    echo "Aborting installation."
-    exit 0
+    echo "Preserving existing server & configuration."
   fi
 fi
 
@@ -75,17 +75,18 @@ if [ -d "$SERVER_PATH/world" ] || [ -d "$SERVER_PATH/world_nether" ] || [ -d "$S
   if [[ "$confirm" =~ ^[Yy]$ ]]; then
     echo "Removing existing world directory..."
     rm -rf "$SERVER_PATH/world" "$SERVER_PATH/world_nether" "$SERVER_PATH/world_the_end"
+    sed -i "s/^level-seed=.*/level-seed=$SEED/" "$SERVER_PATH/server.properties"
   else
     echo "Preserving existing world data."
   fi
 fi
 
-if [ -d "$SERVER_PATH/world" ] || [ -d "$SERVER_PATH/world_nether" ] || [ -d "$SERVER_PATH/world_the_end" ]; then
+if [ -d "$SERVER_PATH/plugins" ] || [ -d "$SERVER_PATH/mods" ]; then
   echo "Warning: Existing plugins/mods were found."
   read -p "Do you want to delete them? [y/N] " confirm
   if [[ "$confirm" =~ ^[Yy]$ ]]; then
     echo "Removing existing plugins/mods..."
-    rm -rf "$SERVER_PATH/plugins" "$SERVER_PATH/mods" "$SERVER_PATH/world_the_end"
+    rm -rf "$SERVER_PATH/plugins" "$SERVER_PATH/mods"
   else
     echo "Preserving existing plugins/mods."
   fi
@@ -115,6 +116,7 @@ echo "Downloading $LOADER $VERSION..."
 JAR_URL=$(curl -s "$MCUTILS_URL/api/server-jars/$LOADER/$VERSION" | jq -r '.downloadUrl')
 curl -L "$JAR_URL" -o "$CACHE/$LOADER/$VERSION/$JAR"
 
+rm "$JAR"
 cp "$CACHE/$LOADER/$VERSION/$JAR" "$JAR"
 
 # === SERVER SETUP ===
@@ -133,10 +135,10 @@ else
   echo "FIFO pipe already exists."
 fi
 
-
 # === START SERVER ===
 
 echo "Building and starting the Minecraft server..."
+docker-compose down
 docker-compose up --build -d
 
 echo "Setup complete! Use 'mcctl' utility to manage your server."

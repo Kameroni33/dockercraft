@@ -5,8 +5,8 @@ MAX_LOGS=${MAX_LOGS:-10}
 MAX_BACKUPS=${MAX_BACKUPS:-10}
 
 # Set backup folder
-TIMESTAMP=$(date +%Y-%m-%d)
-BACKUP_FILE="$BACKUP_DIR/backup-$TIMESTAMP.tar.gz"
+TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
+BACKUP_FILE="$BACKUP_DIR/backup_$TIMESTAMP.tar.gz"
 
 # Ensure backup directory exists
 mkdir -p "$BACKUP_DIR" "$LOG_DIR"
