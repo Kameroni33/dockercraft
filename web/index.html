@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dockercraft - Minecraft Server Manager</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>🎮 Dockercraft</h1>
+                <p>Minecraft Server Management Dashboard</p>
+            </div>
+            
+
+            <button id="open-create-server" class="btn-create">
+                Create Server
+            </button>
+        </header>
+
+        <div id="error-message" class="error hidden"></div>
+        <div id="success-message" class="success hidden"></div>
+
+        <div id="loading" class="loading">
+            Loading servers...
+        </div>
+
+        <div id="servers" class="server-grid hidden"></div>
+
+        <div id="console-section" class="console-section hidden">
+            <h2>Server Console - <span id="console-server-name"></span></h2>
+            <div id="console">
+                <pre id="console-output">Connecting to console...</pre>
+            </div>
+            <div class="command-input">
+                <input type="text" id="command-input" placeholder="Enter command (e.g., 'list', 'say Hello', 'stop')..." />
+                <button class="btn-start" onclick="app.sendCommand()">Send</button>
+                <button class="btn-stop" onclick="app.closeConsole()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-server-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Create New Server</h2>
+
+            <form id="create-server-form">
+                <div class="form-row">
+                    <label>Server ID:</label>
+                    <input type="text" id="server-id" required>
+                </div>
+
+                <div class="form-row">
+                    <label>Name:</label>
+                    <input type="text" id="server-name" required>
+                </div>
+
+                <div class="form-row">
+                    <label>Type:</label>
+                    <select id="server-type">
+                        <option value="paper" selected>Paper</option>
+                        <option value="vanilla">Vanilla</option>
+                        <option value="fabric">Fabric</option>
+                        <option value="forge">Forge</option>
+                        <option value="spigot">Spigot</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <label>Version:</label>
+                    <input type="text" id="server-version" value="1.21">
+                </div>
+
+                <div class="form-row">
+                    <label>Min Memory:</label>
+                    <input type="text" id="memory-min" value="2G">
+                </div>
+
+                <div class="form-row">
+                    <label>Max Memory:</label>
+                    <input type="text" id="memory-max" value="4G">
+                </div>
+
+                <div class="form-row">
+                    <label>Port:</label>
+                    <input type="number" id="server-port" value="25565">
+                </div>
+
+                <div class="form-row">
+                    <label>RCON Port:</label>
+                    <input type="number" id="rcon-port" value="25575">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn-start">Create</button>
+                    <button id="close-create-server" type="button" class="btn-stop">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Load JavaScript modules -->
+    <script src="js/api.js"></script>
+    <script src="js/console.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

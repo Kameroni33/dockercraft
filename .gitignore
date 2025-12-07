@@ -1,12 +1,13 @@
 # JetBrains IDE
 .idea
 
+# Local environment
+.env
+
 # Server folders & files
-/server
-/backups
-/logs
-/fifo
-server.jar
+/data/*
+/config/*
 
 # Cache
+__pycache__
 .cache
