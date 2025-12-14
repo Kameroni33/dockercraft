@@ -16,7 +16,13 @@ class Settings(BaseSettings):
     backups_path: Path = data_path / "backups"
     logs_path: Path = data_path / "logs"
 
+    # Logs
     log_file: str = "app.log"
+
+    # Authentication
+    admin_username: str = "admin"
+    admin_password_hash: str = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5eBWXvqJ4Y9qi"  # "changeme"
+    auth_enabled: bool = True
     
     # RCON
     rcon_password: str = "changeme"
@@ -71,8 +77,25 @@ def setup_logging() -> None:
     root_logger.addHandler(file_handler)
 
 
+def initalize_config(config: str) -> None:
+    """Initialize configuration YAML file"""
+    config_path = Path(f"{settings.config_path}/{config}.yml")
+    if not config_path.exists():
+        with open(config_path) as file:
+            yaml.dump({
+            "instances": {},
+            "settings": {
+                "backup_retention_days": 30,
+                "log_retention_days": 7,
+                "max_backups_per_instance": 10,
+                "rcon_timeout": 10,
+            }
+        }, file, default_flow_style=False)
+    return None
+
+
 def load_config(config: str) -> dict|None:
-    """Load server configurations from YAML"""
+    """Load configurations from YAML file"""
     config_path = Path(f"{settings.config_path}/{config}.yml")
     if config_path.exists():
         with open(config_path) as file:
@@ -81,7 +104,7 @@ def load_config(config: str) -> dict|None:
 
 
 def save_config(config: str, contents: dict) -> None:
-    """Save server configuration"""
+    """Save configuration to YAML file"""
     config_path = Path(f"{settings.config_path}/{config}.yml")
     with open(config_path, 'w') as file:
         yaml.dump(contents, file, default_flow_style=False)

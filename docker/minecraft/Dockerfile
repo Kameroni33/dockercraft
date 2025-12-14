@@ -1,9 +1,7 @@
-FROM openjdk:21-jdk-slim
+FROM amazoncorretto:21-alpine-jdk
 
 # Install system dependencies
-RUN apt-get update
-RUN apt-get install -y curl
-RUN rm -rf /var/lib/apt/lists/*
+RUN apk update && apk add --no-cache curl shadow
 
 # Create minecraft user and directory
 RUN useradd -m -u 1000 minecraft

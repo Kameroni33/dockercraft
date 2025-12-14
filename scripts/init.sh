@@ -5,14 +5,14 @@ set -e
 echo "Initializing Dockercraft..."
 
 # Create directory structure
-mkdir -p data/instances/survival
-mkdir -p data/backups/survival
-mkdir -p data/logs/survival
+mkdir -p data/instances
+mkdir -p data/backups
+mkdir -p data/logs
 
 # Copy .env.example to .env if not exists
 if [ ! -f .env ]; then
     cp .env.example .env
-    echo "Created .env file - please update RCON_PASSWORD!"
+    echo "Created .env file"
 fi
 
 # Generate random RCON password if still default
@@ -35,11 +35,9 @@ fi
 
 # Build and start services
 echo "Building Docker containers..."
-docker-compose build
+docker build -f docker/minecraft/Dockerfile -t dockercraft-minecraft:latest .
+docker compose -f compose.yml up --build --detach
 
 echo ""
-echo "Setup complete! Next steps:"
-echo "  1. Download server.jar to data/instances/survival/"
-echo "  2. Run: docker-compose up -d"
-echo "  3. Access web UI at http://localhost:8080"
-echo "  4. API docs at http://localhost:8000/docs"
+echo "Setup complete! WEeb UI running at http://localhost:8080"
+echo ""

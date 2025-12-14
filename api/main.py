@@ -1,11 +1,11 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import logging
 
 from routers import servers, backups, mods, console
 from config import settings, setup_logging
+from auth import get_current_user
 
 
 setup_logging()
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     logger.info("Starting Dockercraft API...")
+    logger.info(f"Authentication: {'Enabled' if settings.auth_enabled else 'Disabled'}")
     yield
     logger.info("Shutting down Dockercraft API...")
 
@@ -35,20 +36,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(servers.router, prefix="/api/servers", tags=["servers"])
-app.include_router(backups.router, prefix="/api/backups", tags=["backups"])
-app.include_router(mods.router, prefix="/api/mods", tags=["mods"])
-app.include_router(console.router, prefix="/ws", tags=["console"])
-
+# Public routes (no auth required)
 @app.get("/")
 async def root():
     return {
         "message": "Dockercraft API",
         "version": "2.0.0",
-        "docs": "/docs"
+        "docs": "/docs",
+        "auth_enabled": settings.auth_enabled,
     }
 
 @app.get("/api/health")
 async def health():
     return {"status": "healthy"}
+
+# Protected routes - require authentication
+if settings.auth_enabled:
+    app.include_router(servers.router, prefix="/api/servers", tags=["servers"], dependencies=[Depends(get_current_user)])
+    app.include_router(backups.router, prefix="/api/backups", tags=["backups"], dependencies=[Depends(get_current_user)])
+    app.include_router(mods.router, prefix="/api/mods", tags=["mods"], dependencies=[Depends(get_current_user)])
+    app.include_router(console.router, prefix="/ws", tags=["console"], dependencies=[Depends(get_current_user)])
+else:
+    # No authentication
+    app.include_router(servers.router, prefix="/api/servers", tags=["servers"])
+    app.include_router(backups.router, prefix="/api/backups", tags=["backups"])
+    app.include_router(mods.router, prefix="/api/mods", tags=["mods"])
+    app.include_router(console.router, prefix="/ws", tags=["console"])

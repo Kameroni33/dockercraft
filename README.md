@@ -5,11 +5,5 @@
 ## Setup
 
 ```shell
-sudo ./setup.sh
-```
-
-## mcctl
-
-```shell
-mcctl help
+sudo scripts/init.sh
 ```
