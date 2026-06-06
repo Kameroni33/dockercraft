@@ -2,6 +2,15 @@
 
 from api.models.backup import Backup
 from api.models.instance import InstanceCreate, InstanceRead, Loader, ServerInstance
+from api.models.mod import InstalledMod
 from api.models.player import Player
 
-__all__ = ["Backup", "InstanceCreate", "InstanceRead", "Loader", "Player", "ServerInstance"]
+__all__ = [
+    "Backup",
+    "InstalledMod",
+    "InstanceCreate",
+    "InstanceRead",
+    "Loader",
+    "Player",
+    "ServerInstance",
+]

@@ -58,10 +58,15 @@ def delete_instance(session: Session, instance: ServerInstance, delete_data: boo
         shutil.rmtree(paths.instance_dir(instance.name), ignore_errors=True)
     # Backups outlive the instance — orphan them instead of cascading.
     from api.models.backup import Backup
+    from api.models.mod import InstalledMod
 
     for backup in session.exec(select(Backup).where(Backup.instance_id == instance.id)).all():
         backup.instance_id = None
         session.add(backup)
+    for mod in session.exec(
+        select(InstalledMod).where(InstalledMod.instance_id == instance.id)
+    ).all():
+        session.delete(mod)
     session.delete(instance)
     session.commit()
 
