@@ -3,7 +3,8 @@ from pydantic import BaseModel, Field
 
 from api.db import SessionDep
 from api.models.backup import Backup
-from api.services import backups, instances
+from api.models.instance import InstanceRead
+from api.services import backups, docker_manager, instances
 
 router = APIRouter(tags=["backups"])
 
@@ -67,3 +68,32 @@ def list_all(session: SessionDep):
 @router.delete("/backups/{backup_id}", status_code=204)
 def delete_backup(backup_id: int, session: SessionDep):
     backups.delete_backup(session, _backup_or_404(session, backup_id))
+
+
+class CloneBody(BaseModel):
+    name: str
+
+
+@router.post("/backups/{backup_id}/restore", response_model=Backup)
+def restore_backup(backup_id: int, session: SessionDep):
+    """Restore in place. Returns the automatic pre_restore safety backup."""
+    backup = _backup_or_404(session, backup_id)
+    if backup.instance_id is None:
+        raise HTTPException(
+            409, "backup's instance no longer exists — use /clone to make a new one"
+        )
+    instance = _instance_or_404(session, backup.instance_id)
+    return backups.restore_backup(session, backup, instance)
+
+
+@router.post("/backups/{backup_id}/clone", response_model=InstanceRead, status_code=201)
+def clone_backup(backup_id: int, body: CloneBody, session: SessionDep):
+    """Create a brand-new instance (fresh ports) from this backup."""
+    backup = _backup_or_404(session, backup_id)
+    try:
+        instance = backups.clone_backup(session, backup, body.name)
+    except instances.InvalidNameError as e:
+        raise HTTPException(422, str(e)) from e
+    except instances.DuplicateNameError as e:
+        raise HTTPException(409, str(e)) from e
+    return InstanceRead(**instance.model_dump(), status=docker_manager.status(instance))

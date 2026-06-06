@@ -5,6 +5,7 @@ then always re-enable autosave. Archives live under data/backups/<instance>/ and
 exclude logs/. Retention pruning only ever deletes scheduled/pre_restore backups.
 """
 
+import shutil
 import tarfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -14,8 +15,8 @@ from sqlmodel import Session, select
 from api import paths
 from api.config import settings
 from api.models.backup import Backup
-from api.models.instance import ServerInstance
-from api.services import console, docker_manager
+from api.models.instance import InstanceCreate, Loader, ServerInstance
+from api.services import console, docker_manager, instances
 
 EXCLUDE = {"logs"}  # top-level instance-dir entries left out of archives
 SAVE_TIMEOUT = 120  # save-all flush can take a while on big worlds
@@ -102,6 +103,63 @@ def extract_backup(backup: Backup, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     with tarfile.open(backup_path(backup), "r:gz") as tar:
         tar.extractall(dest, filter="data")  # "data" filter blocks path escapes
+
+
+def restore_backup(session: Session, backup: Backup, instance: ServerInstance) -> Backup:
+    """Restore an archive over its instance. Stops the server first (restarting
+    after if it was running) and takes a pre_restore safety backup. Returns the
+    safety backup. Instance provisioning fields are synced to the snapshot so
+    the row matches the restored jar/world."""
+    was_running = docker_manager.status(instance) == "running"
+    if was_running:
+        docker_manager.stop(instance)
+    safety = create_backup(
+        session, instance, kind="pre_restore", note=f"auto, before restoring backup {backup.id}"
+    )
+
+    target = paths.instance_dir(instance.name)
+    shutil.rmtree(target, ignore_errors=True)
+    extract_backup(backup, target)
+
+    instance.mc_version = backup.mc_version
+    instance.loader = Loader(backup.loader)
+    instance.loader_version = backup.loader_version
+    instance.java_major = backup.java_major
+    instance.server_jar = backup.server_jar
+    session.add(instance)
+    session.commit()
+
+    # Config (image/env) may have changed with the snapshot — rebuild container.
+    docker_manager.remove_container(instance)
+    if was_running:
+        instances.start_instance(instance)
+    session.refresh(safety)  # un-expire after the instance-sync commit (else {} serialized)
+    return safety
+
+
+def clone_backup(session: Session, backup: Backup, name: str) -> ServerInstance:
+    """Spin up a NEW instance (fresh ports/RCON password) from a backup. Works
+    for orphaned backups too. Not started automatically."""
+    instance = instances.create_instance(
+        session,
+        InstanceCreate(
+            name=name,
+            mc_version=backup.mc_version,
+            loader=Loader(backup.loader),
+            loader_version=backup.loader_version,
+            memory=backup.memory,
+            jvm_flags=backup.jvm_flags,
+        ),
+    )
+    instance.java_major = backup.java_major
+    instance.server_jar = backup.server_jar
+    session.add(instance)
+    session.commit()
+    session.refresh(instance)
+    extract_backup(backup, paths.instance_dir(instance.name))
+    # Old rcon.password sits in the extracted server.properties; apply_managed
+    # re-asserts the new instance's secrets before every start.
+    return instance
 
 
 def _archive(instance: ServerInstance, kind: str) -> Path:
