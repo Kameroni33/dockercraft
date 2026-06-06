@@ -23,14 +23,14 @@ def _setup(client, **overrides):
         "accept_eula": True,
         **overrides,
     }
-    return client.post("/servers/setup", json=body)
+    return client.post("/api/servers/setup", json=body)
 
 
 def test_eula_required(client, http):
     resp = _setup(client, accept_eula=False)
     assert resp.status_code == 422
     assert "EULA" in resp.json()["detail"]
-    assert client.get("/servers").json() == []  # nothing left behind
+    assert client.get("/api/servers").json() == []  # nothing left behind
 
 
 def test_full_setup(client, http, fake_mojang):
@@ -51,13 +51,13 @@ def test_full_setup(client, http, fake_mojang):
     assert (inst_dir / "fabric-launcher.jar").exists()
     assert (inst_dir / "eula.txt").read_text() == "eula=true\n"
 
-    props = client.get(f"/servers/{data['id']}/properties").json()
+    props = client.get(f"/api/servers/{data['id']}/properties").json()
     assert props["motd"] == "Brother SMP"
     assert props["white-list"] == "true"  # auto-enabled because whitelist given
     assert props["enable-rcon"] == "true"  # managed keys present
 
-    assert client.get(f"/servers/{data['id']}/whitelist").json()[0]["name"] == "Notch"
-    assert client.get(f"/servers/{data['id']}/ops").json()[0]["level"] == 4
+    assert client.get(f"/api/servers/{data['id']}/whitelist").json()[0]["name"] == "Notch"
+    assert client.get(f"/api/servers/{data['id']}/ops").json()[0]["level"] == 4
 
 
 def test_setup_with_start(client, http, fake_docker):
@@ -75,7 +75,7 @@ def test_failed_provision_rolls_back(client, http, monkeypatch, fake_docker):
     monkeypatch.setattr(provision, "provision_instance", boom)
     with pytest.raises(RuntimeError):
         _setup(client)
-    assert client.get("/servers").json() == []
+    assert client.get("/api/servers").json() == []
     assert not paths.instance_dir("wizard").exists()
     assert not (settings.instances_dir / "wizard").exists()
 
@@ -83,4 +83,4 @@ def test_failed_provision_rolls_back(client, http, monkeypatch, fake_docker):
 def test_unknown_whitelist_user_rolls_back(client, http, fake_mojang):
     resp = _setup(client, whitelist=["definitely-not-real"])
     assert resp.status_code == 422
-    assert client.get("/servers").json() == []
+    assert client.get("/api/servers").json() == []

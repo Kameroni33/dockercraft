@@ -11,7 +11,7 @@ from api.services import backups, instances
 
 
 def _server(client, name="bk"):
-    return client.post("/servers", json={"name": name, "mc_version": "1.21.1"}).json()["id"]
+    return client.post("/api/servers", json={"name": name, "mc_version": "1.21.1"}).json()["id"]
 
 
 def _populate(name: str) -> None:
@@ -26,7 +26,7 @@ def _populate(name: str) -> None:
 def test_cold_backup_roundtrip(client, session):
     sid = _server(client)
     _populate("bk")
-    resp = client.post(f"/servers/{sid}/backups", json={"note": "before the creeper"})
+    resp = client.post(f"/api/servers/{sid}/backups", json={"note": "before the creeper"})
     assert resp.status_code == 201
     data = resp.json()
     assert data["kind"] == "manual" and data["note"] == "before the creeper"
@@ -39,8 +39,8 @@ def test_cold_backup_roundtrip(client, session):
     assert "world/level.dat" in names and "server.properties" in names
     assert not any(n.startswith("logs") for n in names)  # logs excluded
 
-    assert len(client.get(f"/servers/{sid}/backups").json()) == 1
-    assert client.delete(f"/backups/{data['id']}").status_code == 204
+    assert len(client.get(f"/api/servers/{sid}/backups").json()) == 1
+    assert client.delete(f"/api/backups/{data['id']}").status_code == 204
     assert not archive.exists()
 
 
@@ -48,7 +48,7 @@ def test_hot_backup_rcon_choreography(client, session, fake_docker, fake_rcon):
     sid = _server(client)
     _populate("bk")
     fake_docker["statuses"]["bk"] = "running"
-    assert client.post(f"/servers/{sid}/backups", json={}).status_code == 201
+    assert client.post(f"/api/servers/{sid}/backups", json={}).status_code == 201
     assert fake_rcon == ["save-off", "save-all flush", "save-on"]
 
 
@@ -66,7 +66,7 @@ def test_prune_policy(client, session):
     sid = _server(client)
     _populate("bk")
     for _ in range(4):
-        client.post(f"/servers/{sid}/backups", json={})  # manual — exempt
+        client.post(f"/api/servers/{sid}/backups", json={})  # manual — exempt
     inst = instances.get_instance(session, sid)
     for _ in range(5):
         backups.create_backup(session, inst, kind="scheduled")
@@ -76,7 +76,7 @@ def test_prune_policy(client, session):
     session.commit()
 
     resp = client.put(
-        f"/servers/{sid}/backup-policy",
+        f"/api/servers/{sid}/backup-policy",
         json={"enabled": True, "interval_hours": 6, "keep_count": 3, "keep_days": 7},
     )
     assert resp.status_code == 200
@@ -94,9 +94,9 @@ def test_prune_policy(client, session):
 def test_backup_survives_instance_deletion(client, session):
     sid = _server(client)
     _populate("bk")
-    bid = client.post(f"/servers/{sid}/backups", json={}).json()["id"]
-    client.delete(f"/servers/{sid}?delete_data=true")
-    all_backups = client.get("/backups").json()
+    bid = client.post(f"/api/servers/{sid}/backups", json={}).json()["id"]
+    client.delete(f"/api/servers/{sid}?delete_data=true")
+    all_backups = client.get("/api/backups").json()
     assert [b["id"] for b in all_backups] == [bid]
     assert all_backups[0]["instance_name"] == "bk"
     assert backups.backup_path(session.get(Backup, bid)).exists()

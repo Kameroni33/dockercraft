@@ -84,6 +84,6 @@ def test_demux_partial_frame():
 
 
 def test_command_endpoint_not_running(client):
-    sid = client.post("/servers", json={"name": "cmd", "mc_version": "1.21.1"}).json()["id"]
-    resp = client.post(f"/servers/{sid}/command", json={"command": "list"})
+    sid = client.post("/api/servers", json={"name": "cmd", "mc_version": "1.21.1"}).json()["id"]
+    resp = client.post(f"/api/servers/{sid}/command", json={"command": "list"})
     assert resp.status_code == 409

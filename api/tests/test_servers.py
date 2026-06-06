@@ -5,7 +5,7 @@ from api.services.ports import PortsExhaustedError
 
 def _create(client, name="test-server", **overrides):
     body = {"name": name, "mc_version": "1.21.1", **overrides}
-    return client.post("/servers", json=body)
+    return client.post("/api/servers", json=body)
 
 
 def test_create_and_get(client):
@@ -18,7 +18,7 @@ def test_create_and_get(client):
     assert data["status"] == "not_created"
     assert "rcon_password" not in data  # secret stays out of API responses
 
-    assert client.get(f"/servers/{data['id']}").json()["name"] == "test-server"
+    assert client.get(f"/api/servers/{data['id']}").json()["name"] == "test-server"
     assert (settings.instances_dir / "test-server").is_dir()
 
 
@@ -42,7 +42,7 @@ def test_invalid_name_422(client):
 def test_lifecycle_endpoints(client, fake_docker):
     sid = _create(client).json()["id"]
     for op in ("start", "stop", "restart"):
-        assert client.post(f"/servers/{sid}/{op}").status_code == 200
+        assert client.post(f"/api/servers/{sid}/{op}").status_code == 200
     assert fake_docker["calls"] == [
         ("start", "test-server"),
         ("stop", "test-server"),
@@ -53,20 +53,20 @@ def test_lifecycle_endpoints(client, fake_docker):
 def test_status_reflected(client, fake_docker):
     sid = _create(client).json()["id"]
     fake_docker["statuses"]["test-server"] = "running"
-    assert client.get(f"/servers/{sid}").json()["status"] == "running"
+    assert client.get(f"/api/servers/{sid}").json()["status"] == "running"
 
 
 def test_delete(client, fake_docker):
     sid = _create(client).json()["id"]
-    assert client.delete(f"/servers/{sid}?delete_data=true").status_code == 204
+    assert client.delete(f"/api/servers/{sid}?delete_data=true").status_code == 204
     assert ("remove_container", "test-server") in fake_docker["calls"]
-    assert client.get(f"/servers/{sid}").status_code == 404
+    assert client.get(f"/api/servers/{sid}").status_code == 404
     assert not (settings.instances_dir / "test-server").exists()
 
 
 def test_missing_instance_404(client):
-    assert client.get("/servers/999").status_code == 404
-    assert client.post("/servers/999/start").status_code == 404
+    assert client.get("/api/servers/999").status_code == 404
+    assert client.post("/api/servers/999/start").status_code == 404
 
 
 def test_ports_exhausted(client, session, monkeypatch):
@@ -84,7 +84,7 @@ def test_ports_exhausted(client, session, monkeypatch):
 def test_extra_ports(client, fake_docker):
     sid = _create(client).json()["id"]
     resp = client.put(
-        f"/servers/{sid}/extra-ports",
+        f"/api/servers/{sid}/extra-ports",
         json=[{"host": 19132, "container": 19132, "proto": "udp"}],
     )
     assert resp.status_code == 200
@@ -95,7 +95,7 @@ def test_extra_ports(client, fake_docker):
 def test_extra_ports_in_container_config(client, session, fake_docker):
     sid = _create(client).json()["id"]
     client.put(
-        f"/servers/{sid}/extra-ports",
+        f"/api/servers/{sid}/extra-ports",
         json=[{"host": 19132, "container": 19132, "proto": "udp"}],
     )
     from api.services import docker_manager

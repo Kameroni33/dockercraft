@@ -7,9 +7,9 @@ NOW = datetime.now(UTC).replace(tzinfo=None)
 
 
 def _enabled_server(client, session, name, running=True, fake_docker=None):
-    sid = client.post("/servers", json={"name": name, "mc_version": "1.21.1"}).json()["id"]
+    sid = client.post("/api/servers", json={"name": name, "mc_version": "1.21.1"}).json()["id"]
     client.put(
-        f"/servers/{sid}/backup-policy",
+        f"/api/servers/{sid}/backup-policy",
         json={"enabled": True, "interval_hours": 6, "keep_count": 3, "keep_days": 0},
     )
     (paths.instance_dir(name) / "world").mkdir(parents=True, exist_ok=True)
@@ -31,10 +31,11 @@ def test_first_sweep_backs_up(client, session, fake_docker, fake_rcon):
 
 def test_stopped_and_disabled_skipped(client, session, fake_docker):
     _enabled_server(client, session, "stopped", running=False, fake_docker=fake_docker)
-    sid = client.post("/servers", json={"name": "nopolicy", "mc_version": "1.21.1"}).json()["id"]
+    resp = client.post("/api/servers", json={"name": "nopolicy", "mc_version": "1.21.1"})
+    sid = resp.json()["id"]
     fake_docker["statuses"]["nopolicy"] = "running"
     assert scheduler.run_due_backups(session, now=NOW) == []
-    assert client.get(f"/servers/{sid}/backups").json() == []
+    assert client.get(f"/api/servers/{sid}/backups").json() == []
 
 
 def test_sweep_prunes(client, session, fake_docker, fake_rcon):
