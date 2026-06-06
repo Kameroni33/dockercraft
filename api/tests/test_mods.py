@@ -152,3 +152,16 @@ def test_auto_update_flag(client, fake_modrinth):
     mod = client.patch(f"/servers/{sid}/mods/SODIUM1", json={"auto_update": True}).json()
     assert mod["auto_update"] is True
     assert mods_service  # imported for completeness; service tested via endpoints
+
+
+def test_auto_update_sweep(client, session, fake_modrinth):
+    from api.services import scheduler
+
+    sid = _server(client)
+    client.post(f"/servers/{sid}/mods", json={"project": "sodium", "version_id": "sv1"})
+    client.post(f"/servers/{sid}/mods", json={"project": "geyser"})  # current; no auto
+
+    assert scheduler.run_mod_updates(session) == []  # nothing flagged yet
+    client.patch(f"/servers/{sid}/mods/SODIUM1", json={"auto_update": True})
+    assert scheduler.run_mod_updates(session) == ["modded:sodium@0.6"]
+    assert scheduler.run_mod_updates(session) == []  # already current

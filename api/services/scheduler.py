@@ -15,6 +15,7 @@ from api.services import backups, docker_manager
 logger = logging.getLogger("dockercraft.scheduler")
 
 SWEEP_MINUTES = 5
+MOD_UPDATE_SWEEP_HOURS = 6
 
 _scheduler: BackgroundScheduler | None = None
 
@@ -50,9 +51,40 @@ def run_due_backups(session: Session, now: datetime | None = None) -> list[Backu
     return created
 
 
+def run_mod_updates(session: Session) -> list[str]:
+    """Update every auto_update mod to its newest compatible version. Updated
+    files take effect on the next restart — we never bounce servers ourselves."""
+    from sqlmodel import col
+
+    from api.models.mod import InstalledMod
+    from api.services import mods
+
+    updated = []
+    auto_mods = session.exec(
+        select(InstalledMod).where(col(InstalledMod.auto_update))
+    ).all()
+    for mod in auto_mods:
+        instance = session.get(ServerInstance, mod.instance_id)
+        if instance is None:
+            continue
+        try:
+            if mods.update_mod(session, instance, mod):
+                updated.append(f"{instance.name}:{mod.slug}@{mod.version_number}")
+                logger.info("auto-updated %s on %r to %s",
+                            mod.slug, instance.name, mod.version_number)
+        except Exception:
+            logger.exception("auto-update of %s on %r failed", mod.slug, instance.name)
+    return updated
+
+
 def _sweep() -> None:
     with Session(get_engine()) as session:
         run_due_backups(session)
+
+
+def _mod_sweep() -> None:
+    with Session(get_engine()) as session:
+        run_mod_updates(session)
 
 
 def start() -> None:
@@ -61,6 +93,9 @@ def start() -> None:
         return
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(_sweep, "interval", minutes=SWEEP_MINUTES, id="backup-sweep")
+    _scheduler.add_job(
+        _mod_sweep, "interval", hours=MOD_UPDATE_SWEEP_HOURS, id="mod-update-sweep"
+    )
     _scheduler.start()
 
 
