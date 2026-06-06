@@ -74,10 +74,11 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] Interactive new-server setup flow (API-level: version, loader, settings)
 
 ### Phase 2 — Mods & backups
-- [ ] Modrinth integration: search, install, compatibility check, dependencies
-- [ ] Per-mod auto-update toggle + scheduled update checks
-- [ ] Backup engine: scheduled snapshots, retention policies
-- [ ] Restore in place / spin up new instance from backup
+- [x] Backup engine: scheduled snapshots, retention policies
+- [x] Restore in place / spin up new instance from backup
+- [x] Modrinth integration: search, install, compatibility check, dependencies
+- [x] Per-mod auto-update toggle + scheduled update checks
+- [x] Per-instance extra port mappings (e.g. Geyser Bedrock UDP 19132)
 
 ### Phase 3 — Web UI (Vue 3)
 - [ ] Dashboard: instance list, status, addresses, start/stop
@@ -134,3 +135,13 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
   Verified e2e: real Fabric server on MC 26.1.2 (needed Java 25 — image auto-built),
   RCON commands, live whitelist, WS console stdin/stdout, graceful stop/delete.
   38 unit tests green. Next: Phase 2 (Modrinth mods, backups) after stage review.
+- 2026-06-06: **Phase 2 COMPLETE.** Backups (hot via RCON save-off/flush/save-on,
+  retention policies, APScheduler sweep, restore-in-place w/ pre_restore safety,
+  clone-to-new-instance, backups outlive instance deletion). Modrinth (search,
+  install w/ recursive required-dep resolution, sha512 verify, .disabled toggle,
+  auto-update sweep). Extra port mappings per instance. Verified live: Geyser +
+  Floodgate + auto-resolved Fabric API on MC 26.1.2, Bedrock UDP 19132 bound on
+  host, whitelist intact, 148 MB hot backup of the running modded server.
+  59 unit tests green. Notes: Floodgate is optional-dep on Modrinth — install
+  explicitly; backup includes fabric libs (~148 MB) — could exclude rebuildable
+  caches later. Next: Phase 3 (Vue UI) after stage review.

@@ -79,3 +79,28 @@ def test_ports_exhausted(client, session, monkeypatch):
         raise AssertionError("expected PortsExhaustedError")
     except PortsExhaustedError:
         pass
+
+
+def test_extra_ports(client, fake_docker):
+    sid = _create(client).json()["id"]
+    resp = client.put(
+        f"/servers/{sid}/extra-ports",
+        json=[{"host": 19132, "container": 19132, "proto": "udp"}],
+    )
+    assert resp.status_code == 200
+    assert ("recreate_container", "test-server") in fake_docker["calls"]
+
+
+
+def test_extra_ports_in_container_config(client, session, fake_docker):
+    sid = _create(client).json()["id"]
+    client.put(
+        f"/servers/{sid}/extra-ports",
+        json=[{"host": 19132, "container": 19132, "proto": "udp"}],
+    )
+    from api.services import docker_manager
+    from api.services.instances import get_instance
+
+    cfg = docker_manager.container_config(get_instance(session, sid))
+    assert cfg["ports"]["19132/udp"] == 19132
+    assert cfg["ports"]["25565/tcp"] == settings.game_port_range[0]

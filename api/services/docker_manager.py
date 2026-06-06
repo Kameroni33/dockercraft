@@ -52,6 +52,15 @@ def ensure_image(java_major: int) -> str:
 
 def container_config(instance: ServerInstance) -> dict:
     """Build the kwargs for containers.create() for this instance."""
+    import json
+
+    ports = {
+        "25565/tcp": instance.game_port,
+        "25565/udp": instance.game_port,
+        "25575/tcp": instance.rcon_port,
+    }
+    for extra in json.loads(instance.extra_ports_json):
+        ports[f"{extra['container']}/{extra.get('proto', 'tcp')}"] = extra["host"]
     return {
         "image": image_tag(instance.java_major),
         "name": container_name(instance),
@@ -65,11 +74,7 @@ def container_config(instance: ServerInstance) -> dict:
         "volumes": {
             str(paths.instance_host_dir(instance.name)): {"bind": "/data", "mode": "rw"}
         },
-        "ports": {
-            "25565/tcp": instance.game_port,
-            "25565/udp": instance.game_port,
-            "25575/tcp": instance.rcon_port,
-        },
+        "ports": ports,
         "restart_policy": {"Name": "unless-stopped"},  # crash → restart; API stop sticks
         "labels": {LABEL: instance.name},
     }

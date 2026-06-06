@@ -27,6 +27,9 @@ class ServerInstance(SQLModel, table=True):
     game_port: int = Field(unique=True)
     rcon_port: int = Field(unique=True)
     rcon_password: str = Field(default_factory=lambda: secrets.token_urlsafe(16))
+    # Extra host->container mappings, e.g. Geyser's Bedrock UDP 19132:
+    # [{"host": 19132, "container": 19132, "proto": "udp"}]
+    extra_ports_json: str = "[]"
 
     memory: str = "2G"
     jvm_flags: str = ""
@@ -58,6 +61,7 @@ class InstanceRead(SQLModel):
     java_major: int
     game_port: int
     rcon_port: int
+    extra_ports_json: str
     memory: str
     jvm_flags: str
     created_at: datetime

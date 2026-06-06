@@ -148,6 +148,26 @@ def remove_from_ops(instance_id: int, username: str, session: SessionDep):
         raise HTTPException(404, f"{username!r} is not an op")
 
 
+class ExtraPort(BaseModel):
+    host: int = Field(ge=1, le=65535)
+    container: int = Field(ge=1, le=65535)
+    proto: str = Field(default="tcp", pattern="^(tcp|udp)$")
+
+
+@router.put("/{instance_id}/extra-ports")
+def set_extra_ports(instance_id: int, ports: list[ExtraPort], session: SessionDep) -> dict:
+    """Extra host->container port mappings (e.g. Geyser Bedrock UDP 19132).
+    Applied when the container is next (re)created."""
+    import json
+
+    instance = _get_or_404(session, instance_id)
+    instance.extra_ports_json = json.dumps([p.model_dump() for p in ports])
+    session.add(instance)
+    session.commit()
+    docker_manager.recreate_container(instance)  # applies live; restarts if running
+    return {"extra_ports": [p.model_dump() for p in ports]}
+
+
 class CommandBody(BaseModel):
     command: str
 
