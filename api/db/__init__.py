@@ -1,7 +1,9 @@
 """SQLite engine + session dependency."""
 
 from collections.abc import Iterator
+from typing import Annotated
 
+from fastapi import Depends
 from sqlmodel import Session, SQLModel, create_engine
 
 from api.config import settings
@@ -30,3 +32,6 @@ def init_db() -> None:
 def get_session() -> Iterator[Session]:
     with Session(get_engine()) as session:
         yield session
+
+
+SessionDep = Annotated[Session, Depends(get_session)]

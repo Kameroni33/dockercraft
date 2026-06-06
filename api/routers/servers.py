@@ -1,0 +1,66 @@
+from fastapi import APIRouter, HTTPException
+from sqlmodel import Session
+
+from api.db import SessionDep
+from api.models.instance import InstanceCreate, InstanceRead, ServerInstance
+from api.services import docker_manager, instances
+
+router = APIRouter(prefix="/servers", tags=["servers"])
+
+
+def _read(instance: ServerInstance) -> InstanceRead:
+    return InstanceRead(**instance.model_dump(), status=docker_manager.status(instance))
+
+
+def _get_or_404(session: Session, instance_id: int) -> ServerInstance:
+    instance = instances.get_instance(session, instance_id)
+    if instance is None:
+        raise HTTPException(404, f"instance {instance_id} not found")
+    return instance
+
+
+@router.get("", response_model=list[InstanceRead])
+def list_servers(session: SessionDep):
+    return [_read(i) for i in instances.list_instances(session)]
+
+
+@router.post("", response_model=InstanceRead, status_code=201)
+def create_server(data: InstanceCreate, session: SessionDep):
+    try:
+        instance = instances.create_instance(session, data)
+    except instances.InvalidNameError as e:
+        raise HTTPException(422, str(e)) from e
+    except instances.DuplicateNameError as e:
+        raise HTTPException(409, str(e)) from e
+    return _read(instance)
+
+
+@router.get("/{instance_id}", response_model=InstanceRead)
+def get_server(instance_id: int, session: SessionDep):
+    return _read(_get_or_404(session, instance_id))
+
+
+@router.delete("/{instance_id}", status_code=204)
+def delete_server(instance_id: int, session: SessionDep, delete_data: bool = False):
+    instances.delete_instance(session, _get_or_404(session, instance_id), delete_data)
+
+
+@router.post("/{instance_id}/start", response_model=InstanceRead)
+def start_server(instance_id: int, session: SessionDep):
+    instance = _get_or_404(session, instance_id)
+    docker_manager.start(instance)
+    return _read(instance)
+
+
+@router.post("/{instance_id}/stop", response_model=InstanceRead)
+def stop_server(instance_id: int, session: SessionDep):
+    instance = _get_or_404(session, instance_id)
+    docker_manager.stop(instance)
+    return _read(instance)
+
+
+@router.post("/{instance_id}/restart", response_model=InstanceRead)
+def restart_server(instance_id: int, session: SessionDep):
+    instance = _get_or_404(session, instance_id)
+    docker_manager.restart(instance)
+    return _read(instance)

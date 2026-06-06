@@ -63,12 +63,13 @@ install.sh        first-time host setup (docker, dirs, compose up)
 
 ### Phase 1 — Core orchestration (MVP)
 - [x] Project scaffolding: `api/` package, compose, custom MC image
-- [ ] Instance lifecycle: create / start / stop / restart / delete via docker SDK
+- [x] Instance lifecycle: create / start / stop / restart / delete via docker SDK
+- [x] Port allocation (lowest-free in configured ranges, done at instance create)
 - [ ] Vanilla version installer (piston-meta, any version, dynamic download)
 - [ ] Fabric loader installer (Fabric Meta API)
 - [ ] server.properties / whitelist / ops management per instance
 - [ ] Local player cache (username/UUID) in DB for quick whitelisting across servers
-- [ ] Port allocation + address visibility endpoint
+- [ ] Address visibility endpoint (LAN IP + ports per instance)
 - [ ] Interactive console (WebSocket attach to container stdio) + RCON
 - [ ] Interactive new-server setup flow (API-level: version, loader, settings)
 
@@ -116,3 +117,6 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
   venv tooling (ruff/pytest green), manager Dockerfile + compose, custom MC image
   (`dockercraft/minecraft:javaNN`, per-Java-major builds, uid-1000 `minecraft` user,
   fail-loud entrypoint; provisioning is the manager's job).
+- 2026-06-06: Instance lifecycle done — ServerInstance model (DB = declared config,
+  Docker = live status), docker_manager service layer, port allocator, /servers CRUD +
+  start/stop/restart. 10 tests green, live smoke-tested against real docker socket.
