@@ -65,8 +65,8 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] Project scaffolding: `api/` package, compose, custom MC image
 - [x] Instance lifecycle: create / start / stop / restart / delete via docker SDK
 - [x] Port allocation (lowest-free in configured ranges, done at instance create)
-- [ ] Vanilla version installer (piston-meta, any version, dynamic download)
-- [ ] Fabric loader installer (Fabric Meta API)
+- [x] Vanilla version installer (piston-meta, any version, dynamic download)
+- [x] Fabric loader installer (Fabric Meta API)
 - [ ] server.properties / whitelist / ops management per instance
 - [ ] Local player cache (username/UUID) in DB for quick whitelisting across servers
 - [ ] Address visibility endpoint (LAN IP + ports per instance)
@@ -120,3 +120,7 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
 - 2026-06-06: Instance lifecycle done — ServerInstance model (DB = declared config,
   Docker = live status), docker_manager service layer, port allocator, /servers CRUD +
   start/stop/restart. 10 tests green, live smoke-tested against real docker socket.
+- 2026-06-06: Installers done — mojang + fabric clients (sha1-verified downloads, jar
+  cache under data/cache/), provision service (sets java_major from piston-meta,
+  explicit EULA gate), /versions discovery endpoints. NOTE: MC now uses year-based
+  versions (26.1.x); fabric launcher jar self-fetches the vanilla jar on first boot.
