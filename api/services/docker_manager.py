@@ -11,6 +11,7 @@ import docker
 from docker.errors import ImageNotFound, NotFound
 from docker.models.containers import Container
 
+from api import paths
 from api.config import settings
 from api.models.instance import ServerInstance
 
@@ -49,16 +50,6 @@ def ensure_image(java_major: int) -> str:
     return tag
 
 
-def instance_dir(instance: ServerInstance) -> Path:
-    """Instance data dir as the manager sees it (file IO)."""
-    return settings.instances_dir / instance.name
-
-
-def instance_host_dir(instance: ServerInstance) -> Path:
-    """Instance data dir as the docker HOST sees it (for bind mounts)."""
-    return settings.resolved_host_data_dir / "instances" / instance.name
-
-
 def container_config(instance: ServerInstance) -> dict:
     """Build the kwargs for containers.create() for this instance."""
     return {
@@ -71,7 +62,9 @@ def container_config(instance: ServerInstance) -> dict:
             "MEMORY": instance.memory,
             "JVM_FLAGS": instance.jvm_flags,
         },
-        "volumes": {str(instance_host_dir(instance)): {"bind": "/data", "mode": "rw"}},
+        "volumes": {
+            str(paths.instance_host_dir(instance.name)): {"bind": "/data", "mode": "rw"}
+        },
         "ports": {
             "25565/tcp": instance.game_port,
             "25565/udp": instance.game_port,

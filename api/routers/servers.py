@@ -3,7 +3,7 @@ from sqlmodel import Session
 
 from api.db import SessionDep
 from api.models.instance import InstanceCreate, InstanceRead, ServerInstance
-from api.services import docker_manager, instances
+from api.services import docker_manager, instances, mc_config
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -48,7 +48,7 @@ def delete_server(instance_id: int, session: SessionDep, delete_data: bool = Fal
 @router.post("/{instance_id}/start", response_model=InstanceRead)
 def start_server(instance_id: int, session: SessionDep):
     instance = _get_or_404(session, instance_id)
-    docker_manager.start(instance)
+    instances.start_instance(instance)
     return _read(instance)
 
 
@@ -64,3 +64,19 @@ def restart_server(instance_id: int, session: SessionDep):
     instance = _get_or_404(session, instance_id)
     docker_manager.restart(instance)
     return _read(instance)
+
+
+@router.get("/{instance_id}/properties")
+def get_properties(instance_id: int, session: SessionDep) -> dict[str, str]:
+    return mc_config.read_properties(_get_or_404(session, instance_id))
+
+
+@router.patch("/{instance_id}/properties")
+def patch_properties(instance_id: int, updates: dict, session: SessionDep) -> dict:
+    instance = _get_or_404(session, instance_id)
+    try:
+        props = mc_config.update_properties(instance, updates)
+    except mc_config.ManagedPropertyError as e:
+        raise HTTPException(422, str(e)) from e
+    # File changes only apply on (re)start — tell the caller if one is pending.
+    return {"properties": props, "restart_required": docker_manager.status(instance) == "running"}

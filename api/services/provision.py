@@ -7,10 +7,10 @@ Mutates the instance (java_major, server_jar, loader_version) — caller commits
 import shutil
 from pathlib import Path
 
+from api import paths
 from api.clients import fabric, mojang
 from api.config import settings
 from api.models.instance import Loader, ServerInstance
-from api.services import docker_manager
 
 FABRIC_JAR = "fabric-launcher.jar"
 
@@ -26,7 +26,7 @@ def _cache(*parts: str) -> Path:
 def write_eula(instance: ServerInstance, accepted: bool) -> None:
     if not accepted:
         raise EulaNotAcceptedError("the Minecraft EULA must be accepted to run a server")
-    path = docker_manager.instance_dir(instance) / "eula.txt"
+    path = paths.instance_dir(instance.name) / "eula.txt"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("eula=true\n")
 
@@ -66,7 +66,7 @@ def _provision_fabric(instance: ServerInstance) -> None:
 
 
 def _install(instance: ServerInstance, cached: Path, jar_name: str) -> None:
-    dest_dir = docker_manager.instance_dir(instance)
+    dest_dir = paths.instance_dir(instance.name)
     dest_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(cached, dest_dir / jar_name)
     instance.server_jar = jar_name
