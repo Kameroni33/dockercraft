@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, WebSocket
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
+from api.clients.rcon import RconError
 from api.db import SessionDep
 from api.models.instance import InstanceCreate, InstanceRead, ServerInstance
-from api.services import docker_manager, instances, mc_config, players
+from api.services import console, docker_manager, instances, mc_config, players
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -129,3 +130,34 @@ def add_to_ops(instance_id: int, body: PlayerBody, session: SessionDep) -> list[
 def remove_from_ops(instance_id: int, username: str, session: SessionDep):
     if not mc_config.remove_op(_get_or_404(session, instance_id), username):
         raise HTTPException(404, f"{username!r} is not an op")
+
+
+class CommandBody(BaseModel):
+    command: str
+
+
+@router.post("/{instance_id}/command")
+def run_command(instance_id: int, body: CommandBody, session: SessionDep) -> dict:
+    """One-shot server command via RCON; returns the server's response."""
+    instance = _get_or_404(session, instance_id)
+    try:
+        with console.run_command(instance) as rcon:
+            return {"response": rcon.command(body.command)}
+    except console.NotRunningError as e:
+        raise HTTPException(409, str(e)) from e
+    except (RconError, OSError) as e:
+        raise HTTPException(502, f"RCON failed: {e}") from e
+
+
+@router.websocket("/{instance_id}/console")
+async def console_ws(websocket: WebSocket, instance_id: int, session: SessionDep):
+    """Interactive console: streams stdout/stderr, sends typed lines to stdin."""
+    await websocket.accept()
+    instance = instances.get_instance(session, instance_id)
+    if instance is None:
+        await websocket.close(code=4404, reason=f"instance {instance_id} not found")
+        return
+    if docker_manager.status(instance) != "running":
+        await websocket.close(code=4409, reason=f"instance {instance.name!r} is not running")
+        return
+    await console.bridge_console(websocket, instance)
