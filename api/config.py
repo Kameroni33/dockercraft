@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # Custom MC server image (tagged per Java major, e.g. dockercraft/minecraft:java21).
     mc_image_repo: str = "dockercraft/minecraft"
 
+    # LAN IP players connect to. Auto-detected when unset; must be set explicitly
+    # when the manager runs in a container (detection would find the bridge IP).
+    lan_ip: str | None = None
+
     database_url: str = ""  # derived from data_dir when empty
 
     @property

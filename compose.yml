@@ -12,4 +12,6 @@ services:
       # Host path of ./data — MC containers are siblings created via the host
       # socket, so their bind mounts must use host paths. Set in .env or here.
       DOCKERCRAFT_HOST_DATA_DIR: ${DOCKERCRAFT_HOST_DATA_DIR:-./data}
+      # Required when containerized: auto-detection would find the bridge IP.
+      DOCKERCRAFT_LAN_IP: ${DOCKERCRAFT_LAN_IP:-}
     restart: unless-stopped
