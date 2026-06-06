@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# Runtime data (worlds, backups, jars, sqlite db)
+data/
+*.db
+
+# Env
+.env
+
+# Frontend (when web/ lands)
+node_modules/
+web/dist/

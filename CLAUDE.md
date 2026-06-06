@@ -62,7 +62,7 @@ install.sh        first-time host setup (docker, dirs, compose up)
 ## Feature plan & status
 
 ### Phase 1 — Core orchestration (MVP)
-- [ ] Project scaffolding: `api/` package, compose, custom MC image
+- [x] Project scaffolding: `api/` package, compose, custom MC image
 - [ ] Instance lifecycle: create / start / stop / restart / delete via docker SDK
 - [ ] Vanilla version installer (piston-meta, any version, dynamic download)
 - [ ] Fabric loader installer (Fabric Meta API)
@@ -112,3 +112,7 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
 ## Status log
 
 - 2026-06-06: Project restarted from scratch. Architecture + stack decided. No code yet.
+- 2026-06-06: Scaffolding done — `api/` package (FastAPI + SQLModel + health endpoint),
+  venv tooling (ruff/pytest green), manager Dockerfile + compose, custom MC image
+  (`dockercraft/minecraft:javaNN`, per-Java-major builds, uid-1000 `minecraft` user,
+  fail-loud entrypoint; provisioning is the manager's job).
