@@ -1,24 +1,7 @@
-import pytest
-
-from api.clients import mojang
 from api.services.players import format_uuid
 
 KAM_UUID_RAW = "069a79f444e94726a5befca90e38aaf5"
 KAM_UUID = "069a79f4-44e9-4726-a5be-fca90e38aaf5"
-
-
-@pytest.fixture
-def fake_mojang(monkeypatch):
-    lookups: list[str] = []
-
-    def lookup(username, client=None):
-        lookups.append(username)
-        if username.lower() == "notch":
-            return {"id": KAM_UUID_RAW, "name": "Notch"}
-        return None
-
-    monkeypatch.setattr(mojang, "lookup_uuid", lookup)
-    return lookups
 
 
 def test_format_uuid():

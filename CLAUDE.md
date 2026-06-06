@@ -69,9 +69,9 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] Fabric loader installer (Fabric Meta API)
 - [x] server.properties / whitelist / ops management per instance
 - [x] Local player cache (username/UUID) in DB for quick whitelisting across servers
-- [ ] Address visibility endpoint (LAN IP + ports per instance)
-- [ ] Interactive console (WebSocket attach to container stdio) + RCON
-- [ ] Interactive new-server setup flow (API-level: version, loader, settings)
+- [x] Address visibility endpoint (LAN IP + ports per instance)
+- [x] Interactive console (WebSocket attach to container stdio) + RCON
+- [x] Interactive new-server setup flow (API-level: version, loader, settings)
 
 ### Phase 2 — Mods & backups
 - [ ] Modrinth integration: search, install, compatibility check, dependencies
@@ -127,3 +127,8 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
 - 2026-06-06: Config + players done — server.properties PATCH (managed keys enforced,
   re-asserted pre-start), whitelist/ops endpoints, Player cache (username↔UUID,
   case-insensitive, Mojang fallback; 400 AND 404 from Mojang = unknown player).
+- 2026-06-06: **Phase 1 COMPLETE.** Console (from-scratch RCON client + WS attach
+  bridge), /addresses, POST /servers/setup wizard (EULA gate, rollback on failure).
+  Verified e2e: real Fabric server on MC 26.1.2 (needed Java 25 — image auto-built),
+  RCON commands, live whitelist, WS console stdin/stdout, graceful stop/delete.
+  38 unit tests green. Next: Phase 2 (Modrinth mods, backups) after stage review.

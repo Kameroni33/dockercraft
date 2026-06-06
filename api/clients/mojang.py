@@ -24,12 +24,20 @@ def make_client() -> httpx.Client:
     return httpx.Client(timeout=30, follow_redirects=True)
 
 
-def list_versions(client: httpx.Client | None = None) -> list[dict]:
-    """All known versions, newest first: [{id, type, url, releaseTime, ...}]."""
+def _manifest(client: httpx.Client | None = None) -> dict:
     c = client or make_client()
     resp = c.get(VERSION_MANIFEST_URL)
     resp.raise_for_status()
-    return resp.json()["versions"]
+    return resp.json()
+
+
+def list_versions(client: httpx.Client | None = None) -> list[dict]:
+    """All known versions, newest first: [{id, type, url, releaseTime, ...}]."""
+    return _manifest(client)["versions"]
+
+
+def latest_release(client: httpx.Client | None = None) -> str:
+    return _manifest(client)["latest"]["release"]
 
 
 def get_version(version_id: str, client: httpx.Client | None = None) -> dict:

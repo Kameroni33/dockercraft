@@ -37,6 +37,23 @@ def fake_docker(monkeypatch):
 
 
 @pytest.fixture
+def fake_mojang(monkeypatch):
+    """Stub Mojang profile lookups: only 'notch' exists. Records queries."""
+    from api.clients import mojang
+
+    lookups: list[str] = []
+
+    def lookup(username, client=None):
+        lookups.append(username)
+        if username.lower() == "notch":
+            return {"id": "069a79f444e94726a5befca90e38aaf5", "name": "Notch"}
+        return None
+
+    monkeypatch.setattr(mojang, "lookup_uuid", lookup)
+    return lookups
+
+
+@pytest.fixture
 def client(session, tmp_path, monkeypatch, fake_docker):
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(settings, "host_data_dir", None)

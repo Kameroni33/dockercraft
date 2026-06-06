@@ -5,7 +5,7 @@ from sqlmodel import Session
 from api.clients.rcon import RconError
 from api.db import SessionDep
 from api.models.instance import InstanceCreate, InstanceRead, ServerInstance
-from api.services import console, docker_manager, instances, mc_config, players
+from api.services import console, docker_manager, instances, mc_config, players, provision, setup
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -34,6 +34,22 @@ def create_server(data: InstanceCreate, session: SessionDep):
         raise HTTPException(422, str(e)) from e
     except instances.DuplicateNameError as e:
         raise HTTPException(409, str(e)) from e
+    return _read(instance)
+
+
+@router.post("/setup", response_model=InstanceRead, status_code=201)
+def setup_server(req: setup.SetupRequest, session: SessionDep):
+    """Full setup wizard: create + provision + EULA + properties + players, optional start."""
+    try:
+        instance = setup.setup_server(session, req)
+    except provision.EulaNotAcceptedError as e:
+        raise HTTPException(422, str(e)) from e
+    except instances.InvalidNameError as e:
+        raise HTTPException(422, str(e)) from e
+    except instances.DuplicateNameError as e:
+        raise HTTPException(409, str(e)) from e
+    except players.UnknownPlayerError as e:
+        raise HTTPException(422, str(e)) from e
     return _read(instance)
 
 
