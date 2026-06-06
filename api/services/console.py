@@ -29,12 +29,12 @@ def _rcon_target(instance: ServerInstance) -> tuple[str, int]:
     return "127.0.0.1", instance.rcon_port
 
 
-def run_command(instance: ServerInstance) -> RconClient:
+def run_command(instance: ServerInstance, timeout: float = 10) -> RconClient:
     """Open an authenticated RCON session for this instance."""
     if docker_manager.status(instance) != "running":
         raise NotRunningError(f"instance {instance.name!r} is not running")
     host, port = _rcon_target(instance)
-    return RconClient(host, port, instance.rcon_password)
+    return RconClient(host, port, instance.rcon_password, timeout=timeout)
 
 
 def demux_docker_stream(buf: bytes) -> tuple[list[bytes], bytes]:

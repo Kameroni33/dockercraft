@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from api.db import init_db
-from api.routers import players, servers, system, versions
+from api.routers import backups, players, servers, system, versions
 
 
 @asynccontextmanager
@@ -18,6 +18,7 @@ def create_app() -> FastAPI:
     app.include_router(servers.router)
     app.include_router(versions.router)
     app.include_router(players.router)
+    app.include_router(backups.router)
     return app
 
 

@@ -31,6 +31,12 @@ class ServerInstance(SQLModel, table=True):
     memory: str = "2G"
     jvm_flags: str = ""
 
+    # Backup policy (0 = unlimited for keep_*; pruning never touches manual backups)
+    backup_enabled: bool = False
+    backup_interval_hours: int = 6
+    backup_keep_count: int = 10
+    backup_keep_days: int = 0
+
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

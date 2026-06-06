@@ -89,6 +89,8 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [ ] `install.sh` one-shot setup on fresh Linux host
 - [ ] Resource limits per instance (RAM/CPU caps — workstation has modest specs)
 - [ ] Auth for the manager (needed before any non-LAN exposure)
+- [ ] Bind RCON host ports to 127.0.0.1 only (currently 0.0.0.0; password-protected,
+      fine on LAN, must fix before internet-facing hosting)
 - [ ] AWS/cloud deployment story
 - [ ] Other loaders: Forge / NeoForge / Paper
 

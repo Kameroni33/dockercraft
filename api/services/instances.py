@@ -56,6 +56,12 @@ def delete_instance(session: Session, instance: ServerInstance, delete_data: boo
     docker_manager.remove_container(instance)
     if delete_data:
         shutil.rmtree(paths.instance_dir(instance.name), ignore_errors=True)
+    # Backups outlive the instance — orphan them instead of cascading.
+    from api.models.backup import Backup
+
+    for backup in session.exec(select(Backup).where(Backup.instance_id == instance.id)).all():
+        backup.instance_id = None
+        session.add(backup)
     session.delete(instance)
     session.commit()
 
