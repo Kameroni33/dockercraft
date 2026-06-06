@@ -7,7 +7,7 @@ from sqlmodel import select
 from api import paths
 from api.config import settings
 from api.models.backup import Backup
-from api.services import backups, console, instances
+from api.services import backups, instances
 
 
 def _server(client, name="bk"):
@@ -44,50 +44,22 @@ def test_cold_backup_roundtrip(client, session):
     assert not archive.exists()
 
 
-def test_hot_backup_rcon_choreography(client, session, fake_docker, monkeypatch):
+def test_hot_backup_rcon_choreography(client, session, fake_docker, fake_rcon):
     sid = _server(client)
     _populate("bk")
     fake_docker["statuses"]["bk"] = "running"
-    commands: list[str] = []
-
-    class FakeRcon:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            pass
-
-        def command(self, cmd):
-            commands.append(cmd)
-            return ""
-
-    monkeypatch.setattr(console, "run_command", lambda inst, timeout=10: FakeRcon())
     assert client.post(f"/servers/{sid}/backups", json={}).status_code == 201
-    assert commands == ["save-off", "save-all flush", "save-on"]
+    assert fake_rcon == ["save-off", "save-all flush", "save-on"]
 
 
-def test_save_on_even_if_archive_fails(client, session, fake_docker, monkeypatch):
+def test_save_on_even_if_archive_fails(client, session, fake_docker, fake_rcon, monkeypatch):
     sid = _server(client)
     instance = instances.get_instance(session, sid)
     fake_docker["statuses"]["bk"] = "running"
-    commands: list[str] = []
-
-    class FakeRcon:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            pass
-
-        def command(self, cmd):
-            commands.append(cmd)
-            return ""
-
-    monkeypatch.setattr(console, "run_command", lambda inst, timeout=10: FakeRcon())
     monkeypatch.setattr(backups, "_archive", lambda i, k: 1 / 0)
     with pytest.raises(ZeroDivisionError):
         backups.create_backup(session, instance)
-    assert commands[-1] == "save-on"  # autosave always restored
+    assert fake_rcon[-1] == "save-on"  # autosave always restored
 
 
 def test_prune_policy(client, session):

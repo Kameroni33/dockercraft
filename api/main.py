@@ -4,12 +4,15 @@ from fastapi import FastAPI
 
 from api.db import init_db
 from api.routers import backups, players, servers, system, versions
+from api.services import scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    scheduler.start()
     yield
+    scheduler.shutdown()
 
 
 def create_app() -> FastAPI:

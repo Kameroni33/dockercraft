@@ -37,6 +37,28 @@ def fake_docker(monkeypatch):
 
 
 @pytest.fixture
+def fake_rcon(monkeypatch):
+    """Replace console.run_command with a no-op recorder; returns the command log."""
+    from api.services import console
+
+    commands: list[str] = []
+
+    class FakeRcon:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            pass
+
+        def command(self, cmd):
+            commands.append(cmd)
+            return ""
+
+    monkeypatch.setattr(console, "run_command", lambda inst, timeout=10: FakeRcon())
+    return commands
+
+
+@pytest.fixture
 def fake_mojang(monkeypatch):
     """Stub Mojang profile lookups: only 'notch' exists. Records queries."""
     from api.clients import mojang
