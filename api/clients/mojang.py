@@ -78,7 +78,8 @@ def lookup_uuid(username: str, client: httpx.Client | None = None) -> dict | Non
     """Resolve username -> {'id': uuid, 'name': canonical_name}, or None if unknown."""
     c = client or make_client()
     resp = c.get(f"{PROFILE_API_URL}/{username}")
-    if resp.status_code == 404:
+    # 404 = no such player; 400 = name Mojang considers malformed. Same answer for us.
+    if resp.status_code in (400, 404):
         return None
     resp.raise_for_status()
     return resp.json()

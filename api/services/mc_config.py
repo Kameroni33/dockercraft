@@ -1,14 +1,18 @@
-"""server.properties management per instance.
+"""Per-instance MC config files: server.properties, whitelist.json, ops.json.
 
 The manager owns container-side networking + RCON keys ("managed properties") —
 they are enforced on every write and before every start, and user updates to
 them are rejected. Everything else is the user's to customize.
 """
 
+import json
+
 from api import paths
 from api.models.instance import ServerInstance
 
 PROPERTIES_FILE = "server.properties"
+WHITELIST_FILE = "whitelist.json"
+OPS_FILE = "ops.json"
 
 
 class ManagedPropertyError(ValueError):
@@ -69,3 +73,59 @@ def _to_prop(value) -> str:
     if isinstance(value, bool):  # JSON true/false -> "true"/"false"
         return "true" if value else "false"
     return str(value)
+
+
+# --- whitelist.json / ops.json (lists of {uuid, name, ...}) ---
+
+
+def _read_json_list(instance: ServerInstance, filename: str) -> list[dict]:
+    path = paths.instance_dir(instance.name) / filename
+    return json.loads(path.read_text()) if path.exists() else []
+
+
+def _write_json_list(instance: ServerInstance, filename: str, entries: list[dict]) -> None:
+    path = paths.instance_dir(instance.name) / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(entries, indent=2) + "\n")
+
+
+def _remove_entry(instance: ServerInstance, filename: str, username: str) -> bool:
+    entries = _read_json_list(instance, filename)
+    kept = [e for e in entries if e.get("name", "").lower() != username.lower()]
+    if len(kept) == len(entries):
+        return False
+    _write_json_list(instance, filename, kept)
+    return True
+
+
+def read_whitelist(instance: ServerInstance) -> list[dict]:
+    return _read_json_list(instance, WHITELIST_FILE)
+
+
+def add_whitelist(instance: ServerInstance, uuid: str, name: str) -> list[dict]:
+    entries = read_whitelist(instance)
+    if not any(e.get("uuid") == uuid for e in entries):
+        entries.append({"uuid": uuid, "name": name})
+        _write_json_list(instance, WHITELIST_FILE, entries)
+    return entries
+
+
+def remove_whitelist(instance: ServerInstance, username: str) -> bool:
+    return _remove_entry(instance, WHITELIST_FILE, username)
+
+
+def read_ops(instance: ServerInstance) -> list[dict]:
+    return _read_json_list(instance, OPS_FILE)
+
+
+def add_op(instance: ServerInstance, uuid: str, name: str, level: int = 4) -> list[dict]:
+    entries = [e for e in read_ops(instance) if e.get("uuid") != uuid]
+    entries.append(
+        {"uuid": uuid, "name": name, "level": level, "bypassesPlayerLimit": False}
+    )
+    _write_json_list(instance, OPS_FILE, entries)
+    return entries
+
+
+def remove_op(instance: ServerInstance, username: str) -> bool:
+    return _remove_entry(instance, OPS_FILE, username)

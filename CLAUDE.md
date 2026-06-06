@@ -67,8 +67,8 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] Port allocation (lowest-free in configured ranges, done at instance create)
 - [x] Vanilla version installer (piston-meta, any version, dynamic download)
 - [x] Fabric loader installer (Fabric Meta API)
-- [ ] server.properties / whitelist / ops management per instance
-- [ ] Local player cache (username/UUID) in DB for quick whitelisting across servers
+- [x] server.properties / whitelist / ops management per instance
+- [x] Local player cache (username/UUID) in DB for quick whitelisting across servers
 - [ ] Address visibility endpoint (LAN IP + ports per instance)
 - [ ] Interactive console (WebSocket attach to container stdio) + RCON
 - [ ] Interactive new-server setup flow (API-level: version, loader, settings)
@@ -124,3 +124,6 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
   cache under data/cache/), provision service (sets java_major from piston-meta,
   explicit EULA gate), /versions discovery endpoints. NOTE: MC now uses year-based
   versions (26.1.x); fabric launcher jar self-fetches the vanilla jar on first boot.
+- 2026-06-06: Config + players done — server.properties PATCH (managed keys enforced,
+  re-asserted pre-start), whitelist/ops endpoints, Player cache (username↔UUID,
+  case-insensitive, Mojang fallback; 400 AND 404 from Mojang = unknown player).

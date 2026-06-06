@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from sqlmodel import Session
 
 from api.db import SessionDep
 from api.models.instance import InstanceCreate, InstanceRead, ServerInstance
-from api.services import docker_manager, instances, mc_config
+from api.services import docker_manager, instances, mc_config, players
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -80,3 +81,51 @@ def patch_properties(instance_id: int, updates: dict, session: SessionDep) -> di
         raise HTTPException(422, str(e)) from e
     # File changes only apply on (re)start — tell the caller if one is pending.
     return {"properties": props, "restart_required": docker_manager.status(instance) == "running"}
+
+
+class PlayerBody(BaseModel):
+    username: str
+    level: int = Field(default=4, ge=1, le=4)  # op permission level, ops only
+
+
+def _resolve_or_404(session: Session, username: str):
+    try:
+        return players.resolve(session, username)
+    except players.UnknownPlayerError as e:
+        raise HTTPException(404, str(e)) from e
+
+
+@router.get("/{instance_id}/whitelist")
+def get_whitelist(instance_id: int, session: SessionDep) -> list[dict]:
+    return mc_config.read_whitelist(_get_or_404(session, instance_id))
+
+
+@router.post("/{instance_id}/whitelist")
+def add_to_whitelist(instance_id: int, body: PlayerBody, session: SessionDep) -> list[dict]:
+    instance = _get_or_404(session, instance_id)
+    player = _resolve_or_404(session, body.username)
+    return mc_config.add_whitelist(instance, player.uuid, player.username)
+
+
+@router.delete("/{instance_id}/whitelist/{username}", status_code=204)
+def remove_from_whitelist(instance_id: int, username: str, session: SessionDep):
+    if not mc_config.remove_whitelist(_get_or_404(session, instance_id), username):
+        raise HTTPException(404, f"{username!r} is not on the whitelist")
+
+
+@router.get("/{instance_id}/ops")
+def get_ops(instance_id: int, session: SessionDep) -> list[dict]:
+    return mc_config.read_ops(_get_or_404(session, instance_id))
+
+
+@router.post("/{instance_id}/ops")
+def add_to_ops(instance_id: int, body: PlayerBody, session: SessionDep) -> list[dict]:
+    instance = _get_or_404(session, instance_id)
+    player = _resolve_or_404(session, body.username)
+    return mc_config.add_op(instance, player.uuid, player.username, body.level)
+
+
+@router.delete("/{instance_id}/ops/{username}", status_code=204)
+def remove_from_ops(instance_id: int, username: str, session: SessionDep):
+    if not mc_config.remove_op(_get_or_404(session, instance_id), username):
+        raise HTTPException(404, f"{username!r} is not an op")
