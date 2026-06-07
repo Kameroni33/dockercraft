@@ -212,6 +212,24 @@ def set_extra_ports(instance_id: int, ports: list[ExtraPort], session: SessionDe
     return {"extra_ports": [p.model_dump() for p in ports]}
 
 
+class LanDiscoveryBody(BaseModel):
+    enabled: bool
+
+
+@router.put("/{instance_id}/lan-discovery", response_model=InstanceRead)
+def set_lan_discovery(instance_id: int, body: LanDiscoveryBody, session: SessionDep):
+    """Toggle the phantom sidecar so consoles discover this server as a LAN game.
+    Enabling may move the Bedrock host port out of 19132 (phantom owns it)."""
+    instance = _get_or_404(session, instance_id)
+    try:
+        instances.set_lan_discovery(session, instance, body.enabled)
+    except instances.NoBedrockPortError as e:
+        raise HTTPException(409, str(e)) from e
+    except instances.LanDiscoveryConflictError as e:
+        raise HTTPException(409, str(e)) from e
+    return _read(instance)
+
+
 class CommandBody(BaseModel):
     command: str
 
