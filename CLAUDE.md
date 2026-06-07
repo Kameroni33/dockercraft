@@ -88,13 +88,12 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] New-server setup wizard (incl. one-click cross-platform Geyser/Floodgate)
 
 ### Phase 4 — Ops & beyond
-- [ ] `install.sh` one-shot setup on fresh Linux host
-- [ ] Resource limits per instance (RAM/CPU caps — workstation has modest specs)
-- [ ] Auth for the manager (needed before any non-LAN exposure)
-- [ ] Bind RCON host ports to 127.0.0.1 only (currently 0.0.0.0; password-protected,
-      fine on LAN, must fix before internet-facing hosting)
-- [ ] AWS/cloud deployment story
-- [ ] Other loaders: Forge / NeoForge / Paper
+- [x] `install.sh` one-shot setup on fresh Linux host
+- [x] Resource limits per instance (RAM/CPU caps — workstation has modest specs)
+- [x] Auth for the manager (first-run admin setup, scrypt + HMAC cookie sessions)
+- [x] Bind RCON host ports to 127.0.0.1 only
+- [ ] AWS/cloud deployment story (deferred)
+- [ ] Other loaders: Forge / NeoForge / Paper (deferred)
 
 ### First real-world goal
 Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
@@ -154,3 +153,14 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
   players, mods browser, backups+policy), global backups (orphan clone). Built
   dist served by FastAPI at /; vite dev proxies /api. Verified via headless-
   Chromium screenshots against a real running server. Dev: cd web && npm run dev.
+- 2026-06-06: **Phase 4 COMPLETE** (AWS + other loaders deferred). RCON localhost-
+  only; container mem cap = heap×1.5 + optional cpus (PATCH /servers/{id}); auth
+  (stdlib scrypt + HMAC cookie, first-run /auth/setup, login UI, WS guarded);
+  install.sh (docker check, .env w/ abs data dir + LAN IP + free port + docker
+  GID, compose build+up, health wait). Containerized-manager fixes from live
+  deploy rehearsal: multi-stage Dockerfile (node builds UI; images/ ctx baked
+  in), network_mode host (cross-bridge RCON isolation), manager runs uid 1000
+  to match MC containers (root-owned bind dirs broke fabric). Verified: full
+  deploy on dev box via install.sh — auth, server boot, RCON, hot backup.
+  67 tests green. NEXT: real deployment on the Dell workstation, bug cleanup,
+  then merge vibe-ui -> main.
