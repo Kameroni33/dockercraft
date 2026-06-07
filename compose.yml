@@ -21,5 +21,5 @@ services:
       # host socket, so their bind mounts must use host paths.
       DOCKERCRAFT_HOST_DATA_DIR: ${DOCKERCRAFT_HOST_DATA_DIR}
       DOCKERCRAFT_LAN_IP: ${DOCKERCRAFT_LAN_IP:-}
-    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "${DOCKERCRAFT_PORT:-8080}"]
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "${DOCKERCRAFT_PORT:-25800}"]
     restart: unless-stopped

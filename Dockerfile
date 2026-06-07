@@ -21,5 +21,6 @@ COPY images ./images
 COPY --from=web /build/dist ./web/dist
 
 # Runs with network_mode: host (see compose.yml): reaches host-bound RCON
-# ports, detects the real LAN IP, and serves on host port 8080 directly.
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# ports, detects the real LAN IP, and serves on the host port directly.
+# compose overrides the port from .env (DOCKERCRAFT_PORT).
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "25800"]
