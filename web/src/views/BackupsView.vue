@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { api, ApiError } from "../api";
 import type { Backup } from "../types";
 import { formatBytes, formatDate } from "../format";
+import CopyButton from "../components/CopyButton.vue";
 
 const router = useRouter();
 const backups = ref<Backup[]>([]);
@@ -47,7 +48,9 @@ function remove(b: Backup) {
           <td>{{ formatDate(b.created_at) }}</td>
           <td class="mono dim">{{ b.mc_version }} {{ b.loader }}</td>
           <td><span class="badge" :class="b.kind === 'manual' ? 'running' : 'not_created'">{{ b.kind }}</span></td>
-          <td class="mono dim">{{ formatBytes(b.size_bytes) }}</td>
+          <td class="mono dim" :title="b.path">
+            {{ formatBytes(b.size_bytes) }}<CopyButton :text="b.path" />
+          </td>
           <td class="dim">{{ b.note }}</td>
           <td style="text-align: right; white-space: nowrap">
             <button class="btn btn-sm" @click="clone(b)">Clone to new server</button>

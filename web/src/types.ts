@@ -14,6 +14,10 @@ export interface Instance {
   extra_ports_json: string;
   memory: string;
   jvm_flags: string;
+  backup_enabled: boolean;
+  backup_interval_hours: number;
+  backup_keep_count: number;
+  backup_keep_days: number;
   created_at: string;
   status: string; // running | exited | created | not_created | ...
 }
@@ -74,6 +78,7 @@ export interface Backup {
   loader: string;
   loader_version: string | null;
   filename: string;
+  path: string; // absolute path on the docker host, for manual inspection
   size_bytes: number;
   kind: "manual" | "scheduled" | "pre_restore";
   note: string;

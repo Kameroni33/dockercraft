@@ -66,5 +66,9 @@ class InstanceRead(SQLModel):
     memory: str
     cpus: float
     jvm_flags: str
+    backup_enabled: bool
+    backup_interval_hours: int
+    backup_keep_count: int
+    backup_keep_days: int
     created_at: datetime
     status: str  # computed from docker, attached by the router

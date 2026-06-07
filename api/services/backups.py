@@ -27,6 +27,12 @@ def backup_path(backup: Backup) -> Path:
     return settings.backups_dir / backup.filename
 
 
+def host_backup_path(backup: Backup) -> Path:
+    """The archive's path as the HOST sees it (for humans inspecting files —
+    a containerized manager's own view would be /app/data/...)."""
+    return settings.resolved_host_data_dir / "backups" / backup.filename
+
+
 def list_backups(session: Session, instance_id: int | None = None) -> list[Backup]:
     query = select(Backup).order_by(Backup.created_at.desc())  # type: ignore[attr-defined]
     if instance_id is not None:

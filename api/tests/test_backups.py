@@ -100,3 +100,29 @@ def test_backup_survives_instance_deletion(client, session):
     assert [b["id"] for b in all_backups] == [bid]
     assert all_backups[0]["instance_name"] == "bk"
     assert backups.backup_path(session.get(Backup, bid)).exists()
+
+
+def test_backup_response_includes_host_path(client, monkeypatch):
+    from pathlib import Path
+
+    monkeypatch.setattr(settings, "host_data_dir", Path("/srv/dockercraft/data"))
+    sid = _server(client, "pathy")
+    _populate("pathy")
+    data = client.post(f"/api/servers/{sid}/backups", json={}).json()
+    # Path is the HOST view (what a human can open), not the manager's view
+    assert data["path"] == f"/srv/dockercraft/data/backups/{data['filename']}"
+    assert client.get(f"/api/servers/{sid}/backups").json()[0]["path"] == data["path"]
+
+
+def test_policy_visible_in_server_read(client):
+    sid = _server(client, "policy-read")
+    client.put(
+        f"/api/servers/{sid}/backup-policy",
+        json={"enabled": True, "interval_hours": 1, "keep_count": 5, "keep_days": 0},
+    )
+    # The UI re-populates its form from this payload on reload
+    data = client.get(f"/api/servers/{sid}").json()
+    assert data["backup_enabled"] is True
+    assert data["backup_interval_hours"] == 1
+    assert data["backup_keep_count"] == 5
+    assert data["backup_keep_days"] == 0
