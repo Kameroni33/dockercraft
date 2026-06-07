@@ -112,3 +112,18 @@ def test_bedrock_not_in_cache_message(client, monkeypatch):
     resp = client.post("/api/players", json={"username": ".BrandNewPlayer"})
     assert resp.status_code == 404
     assert "XUID" in resp.json()["detail"]  # error guides toward the workaround
+
+
+def test_whitelist_change_reloads_running_server(client, fake_mojang, fake_docker, fake_rcon):
+    resp = client.post("/api/servers", json={"name": "live-wl", "mc_version": "1.21.1"})
+    sid = resp.json()["id"]
+
+    # Stopped server: no RCON traffic
+    client.post(f"/api/servers/{sid}/whitelist", json={"username": "notch"})
+    assert fake_rcon == []
+
+    # Running server: every whitelist mutation triggers a reload
+    fake_docker["statuses"]["live-wl"] = "running"
+    client.delete(f"/api/servers/{sid}/whitelist/notch")
+    client.post(f"/api/servers/{sid}/whitelist", json={"username": "notch"})
+    assert fake_rcon == ["whitelist reload", "whitelist reload"]
