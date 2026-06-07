@@ -50,7 +50,9 @@ def demux_docker_stream(buf: bytes) -> tuple[list[bytes], bytes]:
     return frames, buf
 
 
-async def bridge_console(websocket: WebSocket, instance: ServerInstance) -> None:
+async def bridge_console(
+    websocket: WebSocket, instance: ServerInstance, tail: int = LOG_TAIL
+) -> None:
     """Bidirectional bridge: container stdout/stderr -> WS, WS text -> stdin."""
     container = docker_manager.get_container(instance)
     sock = container.attach_socket(
@@ -58,9 +60,10 @@ async def bridge_console(websocket: WebSocket, instance: ServerInstance) -> None
     )
     raw = getattr(sock, "_sock", sock)
 
-    history = container.logs(tail=LOG_TAIL)
-    if history:
-        await websocket.send_text(history.decode(errors="replace"))
+    if tail > 0:
+        history = container.logs(tail=tail)
+        if history:
+            await websocket.send_text(history.decode(errors="replace"))
 
     queue: asyncio.Queue[bytes | None] = asyncio.Queue()
     loop = asyncio.get_running_loop()

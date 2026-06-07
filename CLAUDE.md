@@ -94,6 +94,11 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] Bind RCON host ports to 127.0.0.1 only
 - [ ] AWS/cloud deployment story (deferred)
 - [ ] Other loaders: Forge / NeoForge / Paper (deferred)
+- [ ] **Real DB migrations (alembic).** init_db's auto-add-columns is additive-only:
+      it can't rename/drop/retype columns, change constraints/indexes, or backfill
+      data. Fine while the schema is young — adopt alembic BEFORE any non-additive
+      change lands, and definitely before others depend on upgrades (e.g. once the
+      Dell box has real worlds/backups that can't be recreated).
 
 ### First real-world goal
 Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**

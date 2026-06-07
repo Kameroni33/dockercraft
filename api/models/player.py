@@ -10,6 +10,9 @@ class Player(SQLModel, table=True):
     __tablename__ = "player"
 
     id: int | None = Field(default=None, primary_key=True)
-    username: str = Field(unique=True, index=True)  # canonical capitalization from Mojang
-    uuid: str = Field(unique=True)  # dashed format, as MC json files expect
+    # Java: canonical capitalization from Mojang. Bedrock: ".GamerTag"
+    # (Floodgate's prefixed form — the dot marks platform throughout the app).
+    username: str = Field(unique=True, index=True)
+    uuid: str = Field(unique=True)  # dashed; Floodgate UUID for bedrock players
+    platform: str = "java"  # java | bedrock
     cached_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

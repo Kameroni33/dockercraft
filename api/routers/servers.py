@@ -112,6 +112,18 @@ def _resolve_or_404(session: Session, username: str):
         raise HTTPException(404, str(e)) from e
 
 
+def _reload_whitelist(instance: ServerInstance) -> None:
+    """A running server caches whitelist.json in memory — tell it to re-read.
+    Best-effort: a failure just means the change applies on next restart."""
+    if docker_manager.status(instance) != "running":
+        return
+    try:
+        with console.run_command(instance) as rcon:
+            rcon.command("whitelist reload")
+    except (RconError, console.NotRunningError, OSError):
+        pass
+
+
 @router.get("/{instance_id}/whitelist")
 def get_whitelist(instance_id: int, session: SessionDep) -> list[dict]:
     return mc_config.read_whitelist(_get_or_404(session, instance_id))
@@ -121,13 +133,17 @@ def get_whitelist(instance_id: int, session: SessionDep) -> list[dict]:
 def add_to_whitelist(instance_id: int, body: PlayerBody, session: SessionDep) -> list[dict]:
     instance = _get_or_404(session, instance_id)
     player = _resolve_or_404(session, body.username)
-    return mc_config.add_whitelist(instance, player.uuid, player.username)
+    entries = mc_config.add_whitelist(instance, player.uuid, player.username)
+    _reload_whitelist(instance)
+    return entries
 
 
 @router.delete("/{instance_id}/whitelist/{username}", status_code=204)
 def remove_from_whitelist(instance_id: int, username: str, session: SessionDep):
-    if not mc_config.remove_whitelist(_get_or_404(session, instance_id), username):
+    instance = _get_or_404(session, instance_id)
+    if not mc_config.remove_whitelist(instance, username):
         raise HTTPException(404, f"{username!r} is not on the whitelist")
+    _reload_whitelist(instance)
 
 
 @router.get("/{instance_id}/ops")
@@ -214,8 +230,11 @@ def run_command(instance_id: int, body: CommandBody, session: SessionDep) -> dic
 
 
 @router.websocket("/{instance_id}/console")
-async def console_ws(websocket: WebSocket, instance_id: int, session: SessionDep):
-    """Interactive console: streams stdout/stderr, sends typed lines to stdin."""
+async def console_ws(
+    websocket: WebSocket, instance_id: int, session: SessionDep, tail: int = 100
+):
+    """Interactive console: streams stdout/stderr, sends typed lines to stdin.
+    ?tail= controls how much log history is replayed on connect (0 = none)."""
     await websocket.accept()
     # Router-level auth deps don't run for WebSockets — check the cookie directly.
     from api.services import auth as auth_service
@@ -230,4 +249,4 @@ async def console_ws(websocket: WebSocket, instance_id: int, session: SessionDep
     if docker_manager.status(instance) != "running":
         await websocket.close(code=4409, reason=f"instance {instance.name!r} is not running")
         return
-    await console.bridge_console(websocket, instance)
+    await console.bridge_console(websocket, instance, tail=max(0, min(tail, 1000)))

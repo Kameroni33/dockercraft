@@ -4,11 +4,16 @@ import { api } from "../api";
 
 const props = defineProps<{ id: number; running: boolean }>();
 
+const RECONNECT_MS = 2000;
+
 const lines = ref("");
 const command = ref("");
 const connected = ref(false);
 const pane = ref<HTMLElement | null>(null);
 let ws: WebSocket | null = null;
+let reconnectTimer: number | undefined;
+let unmounted = false;
+let everConnected = false;
 
 function append(text: string) {
   lines.value += text.endsWith("\n") ? text : text + "\n";
@@ -18,18 +23,42 @@ function append(text: string) {
 }
 
 function connect() {
-  if (!props.running || ws) return;
-  ws = new WebSocket(api.servers.consoleUrl(props.id));
-  ws.onopen = () => (connected.value = true);
+  if (ws || unmounted) return;
+  // Full history on first attach; just a little context after a reconnect
+  // (the pane already holds the earlier scrollback).
+  ws = new WebSocket(api.servers.consoleUrl(props.id, everConnected ? 10 : 100));
+  ws.onopen = () => {
+    connected.value = true;
+    if (everConnected) append("— console reconnected —");
+    everConnected = true;
+  };
   ws.onmessage = (ev) => append(ev.data);
   ws.onclose = (ev) => {
+    const wasConnected = connected.value;
     connected.value = false;
     ws = null;
     if (ev.reason) append(`— ${ev.reason} —`);
+    else if (wasConnected) append("— console disconnected —");
+    // The attach socket dies on every restart/crash while the server is meant
+    // to be up (a restart often never shows a non-running status to the
+    // 5s poll) — keep retrying until it's back or the tab/server goes away.
+    if (props.running) scheduleReconnect();
   };
 }
 
-function disconnect() {
+function scheduleReconnect() {
+  if (reconnectTimer !== undefined || unmounted) return;
+  reconnectTimer = window.setTimeout(() => {
+    reconnectTimer = undefined;
+    if (props.running) connect();
+  }, RECONNECT_MS);
+}
+
+function teardown() {
+  if (reconnectTimer !== undefined) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+  }
   ws?.close();
   ws = null;
   connected.value = false;
@@ -50,13 +79,18 @@ function send() {
   command.value = "";
 }
 
-onMounted(connect);
-onBeforeUnmount(disconnect);
+onMounted(() => {
+  if (props.running) connect();
+});
+onBeforeUnmount(() => {
+  unmounted = true;
+  teardown();
+});
 watch(
   () => props.running,
   (running) => {
     if (running) connect();
-    else disconnect();
+    else teardown();
   },
 );
 </script>

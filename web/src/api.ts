@@ -84,9 +84,9 @@ export const api = {
       req<void>("DELETE", `/servers/${id}/ops/${encodeURIComponent(username)}`),
     setExtraPorts: (id: number, ports: { host: number; container: number; proto: string }[]) =>
       req<{ extra_ports: unknown[] }>("PUT", `/servers/${id}/extra-ports`, ports),
-    consoleUrl(id: number): string {
+    consoleUrl(id: number, tail = 100): string {
       const proto = location.protocol === "https:" ? "wss" : "ws";
-      return `${proto}://${location.host}/api/servers/${id}/console`;
+      return `${proto}://${location.host}/api/servers/${id}/console?tail=${tail}`;
     },
   },
 

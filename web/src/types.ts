@@ -35,6 +35,7 @@ export interface SetupRequest {
 export interface AddressEntry {
   name: string;
   address: string;
+  public_address: string | null; // null when WAN IP detection failed
   game_port: number;
   rcon_port: number;
   status: string;
@@ -43,13 +44,15 @@ export interface AddressEntry {
 
 export interface Addresses {
   lan_ip: string;
+  public_ip: string | null;
   servers: AddressEntry[];
 }
 
 export interface Player {
   id: number;
-  username: string;
+  username: string; // bedrock players are stored as ".GamerTag"
   uuid: string;
+  platform: "java" | "bedrock";
   cached_at: string;
 }
 

@@ -184,6 +184,19 @@ tr:last-child td { border-bottom: none; }
 }
 .chip button { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0; font-size: 0.9rem; }
 .chip button:hover { color: var(--danger); }
+.copy-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 0 0.3rem;
+  margin-left: 0.3rem;
+  vertical-align: 1px;
+}
+.copy-btn:hover { color: var(--text); border-color: var(--border); }
+.copy-btn.copied { color: var(--accent); }
 .empty { color: var(--text-dim); text-align: center; padding: 2rem 0; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1.25rem; font-size: 0.9rem; }
 .kv dt { color: var(--text-dim); }

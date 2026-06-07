@@ -26,7 +26,41 @@ def init_db() -> None:
     # Import models so SQLModel.metadata knows every table before create_all.
     import api.models  # noqa: F401
 
-    SQLModel.metadata.create_all(get_engine())
+    engine = get_engine()
+    SQLModel.metadata.create_all(engine)
+    _auto_add_columns(engine)
+
+
+def _auto_add_columns(engine) -> None:
+    """Poor-man's migration: ADD COLUMN for model fields missing from existing
+    tables. Additive-only — enough until the schema stabilizes and a real
+    migration tool (alembic) earns its keep."""
+    import sqlalchemy as sa
+
+    inspector = sa.inspect(engine)
+    with engine.connect() as conn:
+        for table in SQLModel.metadata.tables.values():
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+                ddl = (
+                    f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" '
+                    f"{column.type.compile(engine.dialect)}"
+                )
+                default = getattr(column.default, "arg", None)
+                if default is not None and not callable(default):
+                    if isinstance(default, bool):
+                        literal = "1" if default else "0"
+                    elif isinstance(default, int | float):
+                        literal = str(default)
+                    else:
+                        literal = "'{}'".format(str(default).replace("'", "''"))
+                    ddl += f" DEFAULT {literal}"
+                    if not column.nullable:
+                        ddl += " NOT NULL"
+                conn.execute(sa.text(ddl))
+        conn.commit()
 
 
 def get_session() -> Iterator[Session]:
