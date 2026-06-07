@@ -41,6 +41,23 @@ function addressFor(s: Instance): string {
 function publicAddressFor(s: Instance): string | null {
   return addresses.value?.public_ip ? `${addresses.value.public_ip}:${s.game_port}` : null;
 }
+
+/** Host port of the Bedrock (Geyser) UDP mapping, if this server has one. */
+function bedrockPort(s: Instance): number | null {
+  try {
+    const extra: { host: number; container: number; proto: string }[] = JSON.parse(
+      s.extra_ports_json,
+    );
+    return extra.find((p) => p.proto === "udp" && p.container === 19132)?.host ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function bedrockAddressFor(s: Instance, ip: string | null | undefined): string | null {
+  const port = bedrockPort(s);
+  return port && ip ? `${ip}:${port}` : null;
+}
 </script>
 
 <template>
@@ -70,6 +87,17 @@ function publicAddressFor(s: Instance): string | null {
         <dd v-if="publicAddressFor(s)" class="mono" title="share with friends — needs the router port-forward rule below">
           {{ publicAddressFor(s) }}<CopyButton :text="publicAddressFor(s)!" />
         </dd>
+        <template v-if="bedrockPort(s)">
+          <dt>Bedrock</dt>
+          <dd class="mono" :title="`iOS/console players: UDP ${bedrockPort(s)} — forward it on the router for external play`">
+            {{ bedrockAddressFor(s, addresses?.lan_ip) ?? `…:${bedrockPort(s)}` }}
+            <CopyButton v-if="bedrockAddressFor(s, addresses?.lan_ip)" :text="bedrockAddressFor(s, addresses?.lan_ip)!" />
+            <span v-if="bedrockAddressFor(s, addresses?.public_ip)" class="dim">
+              · pub {{ bedrockAddressFor(s, addresses?.public_ip)
+              }}<CopyButton :text="bedrockAddressFor(s, addresses?.public_ip)!" />
+            </span>
+          </dd>
+        </template>
         <dt>Memory</dt>
         <dd>{{ s.memory }}</dd>
       </dl>
