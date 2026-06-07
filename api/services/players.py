@@ -58,9 +58,11 @@ def _resolve_bedrock(gamertag: str) -> Player:
         if xuid is None:
             raise UnknownPlayerError(
                 f"GeyserMC doesn't know the gamertag {gamertag!r} yet (its cache only "
-                "covers players who have used a Geyser server before). Have them "
-                "attempt to join once and retry — or whitelist by XUID: .<digits> "
-                "(find it at e.g. cxkes.me/xbox/xuid)"
+                "covers players who have used a Geyser server before). Fix: whitelist "
+                "by XUID instead — .<digits> (look it up at cxkes.me/xbox/xuid, or "
+                "have them attempt to join once and read the xuid from the console "
+                "log). Alternatively run 'whitelist off', let them join, then "
+                "'whitelist add .<name>' and 'whitelist on' in the console."
             )
     return Player(
         username=f".{gamertag}", uuid=geysermc.floodgate_uuid(xuid), platform="bedrock"
