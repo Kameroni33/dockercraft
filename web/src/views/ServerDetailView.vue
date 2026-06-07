@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api, ApiError } from "../api";
 import type { Instance } from "../types";
@@ -44,6 +44,32 @@ async function lifecycle(action: "start" | "stop" | "restart") {
   }
 }
 
+// Host port of the Bedrock (Geyser) mapping, if any — same heuristic as the dashboard.
+const bedrockPort = computed<number | null>(() => {
+  if (!server.value) return null;
+  try {
+    const extra: { host: number; container: number; proto: string }[] = JSON.parse(
+      server.value.extra_ports_json,
+    );
+    return extra.find((p) => p.proto === "udp" && p.container === 19132)?.host ?? null;
+  } catch {
+    return null;
+  }
+});
+
+async function toggleLanDiscovery() {
+  if (!server.value) return;
+  busy.value = true;
+  try {
+    server.value = await api.servers.setLanDiscovery(props.id, !server.value.lan_discovery);
+    error.value = "";
+  } catch (e) {
+    error.value = e instanceof ApiError ? e.message : String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
 async function destroy() {
   const name = server.value?.name ?? "";
   const answer = prompt(
@@ -81,6 +107,23 @@ async function destroy() {
       <dd class="mono">{{ server.game_port }}</dd>
       <dt>Memory</dt>
       <dd>{{ server.memory }}</dd>
+      <template v-if="bedrockPort !== null">
+        <dt>Console LAN discovery</dt>
+        <dd>
+          <label class="lan-toggle">
+            <input
+              type="checkbox"
+              class="toggle"
+              :checked="server.lan_discovery"
+              :disabled="busy"
+              @change="toggleLanDiscovery"
+            />
+            <span class="hint">
+              consoles (Switch / Xbox / PS) see this server in their LAN games list
+            </span>
+          </label>
+        </dd>
+      </template>
     </dl>
 
     <div class="tabs">
@@ -98,3 +141,9 @@ async function destroy() {
     <BackupsPane v-else-if="tab === 'backups'" :id="id" />
   </template>
 </template>
+
+<style scoped>
+.lan-toggle { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.toggle { cursor: pointer; accent-color: var(--accent); width: 1.05rem; height: 1.05rem; }
+.hint { color: var(--text-dim); font-size: 0.85rem; }
+</style>

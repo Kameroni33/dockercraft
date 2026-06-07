@@ -19,6 +19,7 @@ const maxPlayers = ref(10);
 const whitelistInput = ref("");
 const whitelist = ref<string[]>([]);
 const crossPlatform = ref(false);
+const lanDiscovery = ref(false);
 const acceptEula = ref(false);
 const startNow = ref(true);
 
@@ -63,6 +64,8 @@ async function submit() {
       await api.servers.setExtraPorts(instance.id, [
         { host: 19132, container: 19132, proto: "udp" },
       ]);
+      // May remap the Bedrock host port off 19132 (phantom owns it for discovery).
+      if (lanDiscovery.value) await api.servers.setLanDiscovery(instance.id, true);
     }
     if (startNow.value) await api.servers.start(instance.id);
     router.push(`/server/${instance.id}`);
@@ -137,6 +140,14 @@ async function submit() {
       <label for="xplat">
         Cross-platform support — installs Geyser + Floodgate so Bedrock players
         (consoles/phones) can join via UDP 19132
+      </label>
+    </div>
+
+    <div v-if="loader === 'fabric' && crossPlatform" class="field checkbox" style="margin-left: 1.5rem">
+      <input id="landisc" v-model="lanDiscovery" type="checkbox" class="toggle" />
+      <label for="landisc">
+        Console LAN discovery — consoles (Switch / Xbox / PS) on your network see
+        this server as a LAN game (one server per host)
       </label>
     </div>
 
