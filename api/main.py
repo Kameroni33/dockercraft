@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from api.db import init_db
-from api.routers import backups, mods, players, servers, system, versions
+from api.routers import auth, backups, mods, players, servers, system, versions
+from api.routers.auth import require_auth
 from api.services import scheduler
 
 WEB_DIST = Path(__file__).resolve().parents[1] / "web" / "dist"
@@ -22,12 +23,16 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="dockercraft", lifespan=lifespan)
     api = APIRouter(prefix="/api")
-    api.include_router(system.router)
-    api.include_router(servers.router)
-    api.include_router(versions.router)
-    api.include_router(players.router)
-    api.include_router(backups.router)
-    api.include_router(mods.router)
+    api.include_router(auth.router)  # login/setup/status stay reachable unauthenticated
+    api.include_router(system.router)  # /health open for monitoring
+    protected = APIRouter(dependencies=[Depends(require_auth)])
+    protected.include_router(system.protected_router)  # /addresses
+    protected.include_router(servers.router)
+    protected.include_router(versions.router)
+    protected.include_router(players.router)
+    protected.include_router(backups.router)
+    protected.include_router(mods.router)
+    api.include_router(protected)
     app.include_router(api)
     # Built Vue app (hash routing, so plain static serving suffices). In dev the
     # vite server proxies /api here instead.

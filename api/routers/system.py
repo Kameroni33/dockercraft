@@ -3,7 +3,8 @@ from fastapi import APIRouter
 from api.db import SessionDep
 from api.services import docker_manager, instances, network
 
-router = APIRouter(tags=["system"])
+router = APIRouter(tags=["system"])  # open: just liveness
+protected_router = APIRouter(tags=["system"])  # requires auth (mounted in main)
 
 
 @router.get("/health")
@@ -11,7 +12,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/addresses")
+@protected_router.get("/addresses")
 def addresses(session: SessionDep) -> dict:
     """Connection info per instance — what players use on the LAN, and the
     ports to forward on the router for external access."""

@@ -15,5 +15,6 @@ export const router = createRouter({
       props: (route) => ({ id: Number(route.params.id) }),
     },
     { path: "/backups", name: "backups", component: () => import("./views/BackupsView.vue") },
+    { path: "/login", name: "login", component: () => import("./views/LoginView.vue") },
   ],
 });

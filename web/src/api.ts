@@ -30,6 +30,9 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!resp.ok) {
+    if (resp.status === 401 && !path.startsWith("/auth") && location.hash !== "#/login") {
+      location.hash = "#/login"; // session missing/expired -> login screen
+    }
     let detail = resp.statusText;
     try {
       const data = await resp.json();
@@ -44,6 +47,15 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 }
 
 export const api = {
+  auth: {
+    status: () => req<{ setup_required: boolean; authenticated: boolean }>("GET", "/auth/status"),
+    setup: (username: string, password: string) =>
+      req<{ username: string }>("POST", "/auth/setup", { username, password }),
+    login: (username: string, password: string) =>
+      req<{ username: string }>("POST", "/auth/login", { username, password }),
+    logout: () => req<void>("POST", "/auth/logout"),
+  },
+
   addresses: () => req<Addresses>("GET", "/addresses"),
 
   servers: {

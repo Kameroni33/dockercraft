@@ -217,6 +217,12 @@ def run_command(instance_id: int, body: CommandBody, session: SessionDep) -> dic
 async def console_ws(websocket: WebSocket, instance_id: int, session: SessionDep):
     """Interactive console: streams stdout/stderr, sends typed lines to stdin."""
     await websocket.accept()
+    # Router-level auth deps don't run for WebSockets — check the cookie directly.
+    from api.services import auth as auth_service
+
+    if auth_service.verify_token(websocket.cookies.get(auth_service.COOKIE_NAME)) is None:
+        await websocket.close(code=4401, reason="not authenticated")
+        return
     instance = instances.get_instance(session, instance_id)
     if instance is None:
         await websocket.close(code=4404, reason=f"instance {instance_id} not found")

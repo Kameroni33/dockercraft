@@ -79,7 +79,10 @@ def fake_mojang(monkeypatch):
 def client(session, tmp_path, monkeypatch, fake_docker):
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(settings, "host_data_dir", None)
+    from api.routers.auth import require_auth
+
     app = create_app()
     app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[require_auth] = lambda: "test-admin"
     # No lifespan: init_db would touch the real engine; tests use the override.
     return TestClient(app)
