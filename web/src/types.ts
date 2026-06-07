@@ -74,6 +74,7 @@ export interface Backup {
   loader: string;
   loader_version: string | null;
   filename: string;
+  path: string; // absolute path on the docker host, for manual inspection
   size_bytes: number;
   kind: "manual" | "scheduled" | "pre_restore";
   note: string;

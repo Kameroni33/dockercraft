@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { api, ApiError } from "../api";
 import type { Backup, BackupPolicy } from "../types";
 import { formatBytes, formatDate } from "../format";
+import CopyButton from "./CopyButton.vue";
 
 const props = defineProps<{ id: number }>();
 const router = useRouter();
@@ -109,13 +110,16 @@ const savePolicy = () =>
     </div>
     <table v-if="backups.length">
       <thead>
-        <tr><th>When</th><th>Kind</th><th>Size</th><th>Note</th><th></th></tr>
+        <tr><th>When</th><th>Kind</th><th>Size</th><th>Archive</th><th>Note</th><th></th></tr>
       </thead>
       <tbody>
         <tr v-for="b in backups" :key="b.id">
           <td>{{ formatDate(b.created_at) }}</td>
           <td><span class="badge" :class="b.kind === 'manual' ? 'running' : 'not_created'">{{ b.kind }}</span></td>
           <td class="mono dim">{{ formatBytes(b.size_bytes) }}</td>
+          <td class="mono dim" :title="b.path">
+            {{ b.filename.split("/").pop() }}<CopyButton :text="b.path" />
+          </td>
           <td class="dim">{{ b.note }}</td>
           <td style="text-align: right; white-space: nowrap">
             <button class="btn btn-sm" :disabled="busy" @click="restore(b)">Restore</button>

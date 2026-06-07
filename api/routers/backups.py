@@ -27,6 +27,10 @@ def _instance_or_404(session, instance_id: int):
     return instance
 
 
+def _read(backup: Backup) -> dict:
+    return {**backup.model_dump(), "path": str(backups.host_backup_path(backup))}
+
+
 def _backup_or_404(session, backup_id: int) -> Backup:
     backup = session.get(Backup, backup_id)
     if backup is None:
@@ -34,16 +38,16 @@ def _backup_or_404(session, backup_id: int) -> Backup:
     return backup
 
 
-@router.get("/servers/{instance_id}/backups", response_model=list[Backup])
-def list_for_instance(instance_id: int, session: SessionDep):
+@router.get("/servers/{instance_id}/backups")
+def list_for_instance(instance_id: int, session: SessionDep) -> list[dict]:
     _instance_or_404(session, instance_id)
-    return backups.list_backups(session, instance_id)
+    return [_read(b) for b in backups.list_backups(session, instance_id)]
 
 
-@router.post("/servers/{instance_id}/backups", response_model=Backup, status_code=201)
-def create_backup(instance_id: int, body: BackupCreate, session: SessionDep):
+@router.post("/servers/{instance_id}/backups", status_code=201)
+def create_backup(instance_id: int, body: BackupCreate, session: SessionDep) -> dict:
     instance = _instance_or_404(session, instance_id)
-    return backups.create_backup(session, instance, kind="manual", note=body.note)
+    return _read(backups.create_backup(session, instance, kind="manual", note=body.note))
 
 
 @router.put("/servers/{instance_id}/backup-policy")
@@ -59,10 +63,10 @@ def set_policy(instance_id: int, policy: BackupPolicy, session: SessionDep) -> d
     return {"policy": policy.model_dump(), "pruned": len(pruned)}
 
 
-@router.get("/backups", response_model=list[Backup])
-def list_all(session: SessionDep):
+@router.get("/backups")
+def list_all(session: SessionDep) -> list[dict]:
     """Every backup, including those whose instance no longer exists."""
-    return backups.list_backups(session)
+    return [_read(b) for b in backups.list_backups(session)]
 
 
 @router.delete("/backups/{backup_id}", status_code=204)
@@ -74,8 +78,8 @@ class CloneBody(BaseModel):
     name: str
 
 
-@router.post("/backups/{backup_id}/restore", response_model=Backup)
-def restore_backup(backup_id: int, session: SessionDep):
+@router.post("/backups/{backup_id}/restore")
+def restore_backup(backup_id: int, session: SessionDep) -> dict:
     """Restore in place. Returns the automatic pre_restore safety backup."""
     backup = _backup_or_404(session, backup_id)
     if backup.instance_id is None:
@@ -83,7 +87,7 @@ def restore_backup(backup_id: int, session: SessionDep):
             409, "backup's instance no longer exists — use /clone to make a new one"
         )
     instance = _instance_or_404(session, backup.instance_id)
-    return backups.restore_backup(session, backup, instance)
+    return _read(backups.restore_backup(session, backup, instance))
 
 
 @router.post("/backups/{backup_id}/clone", response_model=InstanceRead, status_code=201)
