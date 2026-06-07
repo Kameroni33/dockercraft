@@ -32,6 +32,7 @@ class ServerInstance(SQLModel, table=True):
     extra_ports_json: str = "[]"
 
     memory: str = "2G"
+    cpus: float = 0  # CPU cores cap; 0 = unlimited
     jvm_flags: str = ""
 
     # Backup policy (0 = unlimited for keep_*; pruning never touches manual backups)
@@ -63,6 +64,7 @@ class InstanceRead(SQLModel):
     rcon_port: int
     extra_ports_json: str
     memory: str
+    cpus: float
     jvm_flags: str
     created_at: datetime
     status: str  # computed from docker, attached by the router

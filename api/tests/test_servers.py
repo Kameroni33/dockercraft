@@ -104,3 +104,33 @@ def test_extra_ports_in_container_config(client, session, fake_docker):
     cfg = docker_manager.container_config(get_instance(session, sid))
     assert cfg["ports"]["19132/udp"] == 19132
     assert cfg["ports"]["25565/tcp"] == settings.game_port_range[0]
+
+
+def test_resource_limits_in_config(client, session, fake_docker):
+    sid = _create(client).json()["id"]
+    resp = client.patch(f"/api/servers/{sid}", json={"memory": "4G", "cpus": 2})
+    assert resp.status_code == 200
+    assert resp.json()["memory"] == "4G" and resp.json()["cpus"] == 2
+    assert ("recreate_container", "test-server") in fake_docker["calls"]
+
+    from api.services import docker_manager
+    from api.services.instances import get_instance
+
+    cfg = docker_manager.container_config(get_instance(session, sid))
+    assert cfg["mem_limit"] == int(4 * 1024**3 * 1.5)
+    assert cfg["nano_cpus"] == 2_000_000_000
+    assert cfg["ports"]["25575/tcp"][0] == "127.0.0.1"  # RCON localhost-only
+
+
+def test_invalid_memory_422(client):
+    sid = _create(client).json()["id"]
+    assert client.patch(f"/api/servers/{sid}", json={"memory": "lots"}).status_code == 422
+
+
+def test_no_cpu_cap_when_zero(client, session, fake_docker):
+    sid = _create(client).json()["id"]
+    from api.services import docker_manager
+    from api.services.instances import get_instance
+
+    cfg = docker_manager.container_config(get_instance(session, sid))
+    assert "nano_cpus" not in cfg and cfg["mem_limit"] > 0

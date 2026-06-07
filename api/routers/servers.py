@@ -148,6 +148,34 @@ def remove_from_ops(instance_id: int, username: str, session: SessionDep):
         raise HTTPException(404, f"{username!r} is not an op")
 
 
+class ResourcePatch(BaseModel):
+    memory: str | None = None
+    cpus: float | None = Field(default=None, ge=0)
+    jvm_flags: str | None = None
+
+
+@router.patch("/{instance_id}", response_model=InstanceRead)
+def patch_server(instance_id: int, body: ResourcePatch, session: SessionDep):
+    """Update runtime resources; the container is recreated to apply (and
+    restarted if it was running)."""
+    instance = _get_or_404(session, instance_id)
+    if body.memory is not None:
+        try:
+            docker_manager.heap_bytes(body.memory)  # validate format
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
+        instance.memory = body.memory
+    if body.cpus is not None:
+        instance.cpus = body.cpus
+    if body.jvm_flags is not None:
+        instance.jvm_flags = body.jvm_flags
+    session.add(instance)
+    session.commit()
+    session.refresh(instance)
+    docker_manager.recreate_container(instance)
+    return _read(instance)
+
+
 class ExtraPort(BaseModel):
     host: int = Field(ge=1, le=65535)
     container: int = Field(ge=1, le=65535)

@@ -17,6 +17,18 @@ from api.models.instance import ServerInstance
 
 LABEL = "dockercraft.instance"
 STOP_TIMEOUT = 60  # seconds for SIGTERM → world save before SIGKILL
+MEM_OVERHEAD = 1.5  # container limit = JVM heap × this (metaspace, native, etc.)
+
+
+def heap_bytes(memory: str) -> int:
+    """Parse a JVM size string ("2G", "2048M") to bytes."""
+    import re
+
+    m = re.fullmatch(r"(\d+)\s*([GgMm])", memory.strip())
+    if not m:
+        raise ValueError(f"invalid memory size {memory!r} (use e.g. 2G or 2048M)")
+    n, unit = int(m.group(1)), m.group(2).lower()
+    return n * (1024**3 if unit == "g" else 1024**2)
 
 _client: docker.DockerClient | None = None
 
@@ -57,11 +69,16 @@ def container_config(instance: ServerInstance) -> dict:
     ports = {
         "25565/tcp": instance.game_port,
         "25565/udp": instance.game_port,
-        "25575/tcp": instance.rcon_port,
+        # RCON is password-protected but plaintext — never expose beyond the host.
+        "25575/tcp": ("127.0.0.1", instance.rcon_port),
     }
     for extra in json.loads(instance.extra_ports_json):
         ports[f"{extra['container']}/{extra.get('proto', 'tcp')}"] = extra["host"]
+    limits: dict = {"mem_limit": int(heap_bytes(instance.memory) * MEM_OVERHEAD)}
+    if instance.cpus > 0:
+        limits["nano_cpus"] = int(instance.cpus * 1e9)
     return {
+        **limits,
         "image": image_tag(instance.java_major),
         "name": container_name(instance),
         "detach": True,
