@@ -119,7 +119,7 @@ async function submit() {
     </div>
 
     <div class="field">
-      <label for="wl">Whitelist (java usernames — enables whitelist when non-empty)</label>
+      <label for="wl">Whitelist — java usernames, or .GamerTag for bedrock (enables whitelist when non-empty)</label>
       <div style="display: flex; gap: 0.5rem">
         <input id="wl" v-model="whitelistInput" placeholder="username, username…" style="flex: 1"
                @keydown.enter.prevent="addWhitelist" />

@@ -53,7 +53,7 @@ const onWhitelist = (u: string) => whitelist.value.some((w) => w.name.toLowerCas
     <div class="card">
       <h2 style="margin-top: 0">Whitelist</h2>
       <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem">
-        <input v-model="wlInput" placeholder="java username" style="flex: 1" @keydown.enter="addWl" />
+        <input v-model="wlInput" placeholder="java username — or .GamerTag for bedrock" style="flex: 1" @keydown.enter="addWl" />
         <button class="btn" @click="addWl">Add</button>
       </div>
       <div class="chips">
@@ -81,7 +81,7 @@ const onWhitelist = (u: string) => whitelist.value.some((w) => w.name.toLowerCas
     <div class="card">
       <h2 style="margin-top: 0">Operators</h2>
       <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem">
-        <input v-model="opInput" placeholder="java username" style="flex: 1" @keydown.enter="addOp" />
+        <input v-model="opInput" placeholder="java username — or .GamerTag for bedrock" style="flex: 1" @keydown.enter="addOp" />
         <button class="btn" @click="addOp">Add op</button>
       </div>
       <div class="chips">

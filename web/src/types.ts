@@ -50,8 +50,9 @@ export interface Addresses {
 
 export interface Player {
   id: number;
-  username: string;
+  username: string; // bedrock players are stored as ".GamerTag"
   uuid: string;
+  platform: "java" | "bedrock";
   cached_at: string;
 }
 
