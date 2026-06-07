@@ -29,7 +29,16 @@ def fake_docker(monkeypatch):
     monkeypatch.setattr(
         docker_manager, "status", lambda i: statuses.get(i.name, "not_created")
     )
-    for op in ("start", "stop", "restart", "remove_container", "recreate_container"):
+    for op in (
+        "start",
+        "stop",
+        "restart",
+        "remove_container",
+        "recreate_container",
+        "start_phantom",
+        "stop_phantom",
+        "remove_phantom",
+    ):
         monkeypatch.setattr(
             docker_manager, op, lambda i, _op=op: calls.append((_op, i.name))
         )

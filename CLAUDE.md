@@ -92,6 +92,8 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] Resource limits per instance (RAM/CPU caps — workstation has modest specs)
 - [x] Auth for the manager (first-run admin setup, scrypt + HMAC cookie sessions)
 - [x] Bind RCON host ports to 127.0.0.1 only
+- [x] Console LAN discovery: phantom sidecar so Switch/Xbox/PS see Geyser servers
+      as LAN games (host-networked, owns UDP 19132 — one instance per host)
 - [ ] AWS/cloud deployment story (deferred)
 - [ ] Other loaders: Forge / NeoForge / Paper (deferred)
 - [ ] **Real DB migrations (alembic).** init_db's auto-add-columns is additive-only:
@@ -169,3 +171,13 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
   deploy on dev box via install.sh — auth, server boot, RCON, hot backup.
   67 tests green. NEXT: real deployment on the Dell workstation, bug cleanup,
   then merge vibe-ui -> main.
+- 2026-06-07: Console LAN discovery (phantom sidecar). Bedrock consoles only
+  find servers via UDP 19132 broadcast, which bridge NAT drops — so a per-
+  instance lan_discovery toggle runs jhead/phantom v0.5.4 (sha256-pinned image,
+  images/phantom/) host-networked: it owns 19132 and proxies to the instance's
+  Bedrock port. Enabling auto-remaps that port off 19132 (range 19133+, dash-
+  board follows); one instance per host (409 otherwise); sidecar rides MC
+  container lifecycle (start/stop/remove hooks). PUT /servers/{id}/lan-
+  discovery; UI toggle on detail page + wizard sub-checkbox. 87 tests green.
+  Remote console players still need the BedrockConnect DNS trick — phantom
+  only helps the console's own LAN.
