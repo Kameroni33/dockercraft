@@ -81,10 +81,11 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] Per-instance extra port mappings (e.g. Geyser Bedrock UDP 19132)
 
 ### Phase 3 — Web UI (Vue 3)
-- [ ] Dashboard: instance list, status, addresses, start/stop
-- [ ] Instance detail: settings editor, live console, player/whitelist mgmt
-- [ ] Mod browser (Modrinth search/install) + backup management
-- [ ] New-server setup wizard
+- [x] API moved under /api; FastAPI serves built web/dist (hash-routed SPA)
+- [x] Dashboard: instance list, status, addresses, start/stop
+- [x] Instance detail: settings editor, live console, player/whitelist mgmt
+- [x] Mod browser (Modrinth search/install) + backup management
+- [x] New-server setup wizard (incl. one-click cross-platform Geyser/Floodgate)
 
 ### Phase 4 — Ops & beyond
 - [ ] `install.sh` one-shot setup on fresh Linux host
@@ -145,3 +146,11 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
   59 unit tests green. Notes: Floodgate is optional-dep on Modrinth — install
   explicitly; backup includes fabric libs (~148 MB) — could exclude rebuildable
   caches later. Next: Phase 3 (Vue UI) after stage review.
+- 2026-06-06: **Phase 3 COMPLETE.** Vue 3 + Vite + TS in web/ (vue + vue-router
+  only, hand-rolled dark theme, hash routing, typed /api client). Views: dashboard
+  (cards, lifecycle, port-forward table), setup wizard (live version list, EULA
+  gate, cross-platform checkbox = geyser+floodgate+UDP 19132), server detail
+  (live WS console w/ RCON fallback, properties editor w/ locked managed keys,
+  players, mods browser, backups+policy), global backups (orphan clone). Built
+  dist served by FastAPI at /; vite dev proxies /api. Verified via headless-
+  Chromium screenshots against a real running server. Dev: cd web && npm run dev.
