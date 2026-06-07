@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # when the manager runs in a container (detection would find the bridge IP).
     lan_ip: str | None = None
 
+    # Public (WAN) IP for sharing with non-LAN players. Auto-detected via
+    # external echo services when unset; set explicitly if you have a static IP
+    # or want to use a dynamic-DNS hostname instead.
+    public_ip: str | None = None
+
     database_url: str = ""  # derived from data_dir when empty
 
     @property

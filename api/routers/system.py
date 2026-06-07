@@ -14,15 +14,18 @@ def health() -> dict[str, str]:
 
 @protected_router.get("/addresses")
 def addresses(session: SessionDep) -> dict:
-    """Connection info per instance — what players use on the LAN, and the
-    ports to forward on the router for external access."""
+    """Connection info per instance: LAN address, shareable public address
+    (valid once the router forwards the port), and the forwarding rule."""
     ip = network.lan_ip()
+    wan = network.public_ip()
     return {
         "lan_ip": ip,
+        "public_ip": wan,
         "servers": [
             {
                 "name": i.name,
                 "address": f"{ip}:{i.game_port}",
+                "public_address": f"{wan}:{i.game_port}" if wan else None,
                 "game_port": i.game_port,
                 "rcon_port": i.rcon_port,
                 "status": docker_manager.status(i),

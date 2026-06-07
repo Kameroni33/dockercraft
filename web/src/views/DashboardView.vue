@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { api, ApiError } from "../api";
 import type { Addresses, Instance } from "../types";
+import CopyButton from "../components/CopyButton.vue";
 import StatusBadge from "../components/StatusBadge.vue";
 import { usePolling } from "../composables/usePolling";
 
@@ -36,6 +37,10 @@ function addressFor(s: Instance): string {
     ? `${addresses.value.lan_ip}:${s.game_port}`
     : `…:${s.game_port}`;
 }
+
+function publicAddressFor(s: Instance): string | null {
+  return addresses.value?.public_ip ? `${addresses.value.public_ip}:${s.game_port}` : null;
+}
 </script>
 
 <template>
@@ -59,8 +64,12 @@ function addressFor(s: Instance): string {
           {{ s.mc_version }} <span class="dim">· {{ s.loader }}</span>
           <span v-if="s.loader_version" class="dim">&nbsp;{{ s.loader_version }}</span>
         </dd>
-        <dt>Address</dt>
-        <dd class="mono">{{ addressFor(s) }}</dd>
+        <dt>LAN</dt>
+        <dd class="mono">{{ addressFor(s) }}<CopyButton :text="addressFor(s)" /></dd>
+        <dt v-if="publicAddressFor(s)">Public</dt>
+        <dd v-if="publicAddressFor(s)" class="mono" title="share with friends — needs the router port-forward rule below">
+          {{ publicAddressFor(s) }}<CopyButton :text="publicAddressFor(s)!" />
+        </dd>
         <dt>Memory</dt>
         <dd>{{ s.memory }}</dd>
       </dl>
@@ -94,12 +103,18 @@ function addressFor(s: Instance): string {
     <div class="card" style="padding: 0.25rem 1rem">
       <table>
         <thead>
-          <tr><th>Server</th><th>Players connect to</th><th>Router rule</th></tr>
+          <tr><th>Server</th><th>LAN</th><th>Public (share this)</th><th>Router rule</th></tr>
         </thead>
         <tbody>
           <tr v-for="a in addresses.servers" :key="a.name">
             <td>{{ a.name }}</td>
-            <td class="mono">{{ a.address }}</td>
+            <td class="mono">{{ a.address }}<CopyButton :text="a.address" /></td>
+            <td class="mono">
+              <template v-if="a.public_address">
+                {{ a.public_address }}<CopyButton :text="a.public_address" />
+              </template>
+              <span v-else class="dim">unknown (offline?)</span>
+            </td>
             <td class="mono dim">{{ a.port_forward_hint }}</td>
           </tr>
         </tbody>
