@@ -8,6 +8,7 @@ SCRIPT_NAME="dockercraft Installation Script"
 SCRIPT_VERSION="1.0.0"
 
 AUTO_INSTALL=false
+UNINSTALL=false
 VERBOSE=false
 
 ROOT_PATH="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
@@ -72,6 +73,10 @@ OPTIONS
         --verbose           Detailed output for debugging
         --auto-install      Allow the script to automatically install Docker
                             (via get.docker.com) if it is missing
+        --uninstall         Remove everything dockercraft created: MC instance
+                            containers, the manager, built images, and .env.
+                            Prompts separately before deleting the data dir
+                            (worlds, backups, manager DB).
 
 EOF
 }
@@ -102,6 +107,66 @@ detect_lan_ip() {
     ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || echo ""
 }
 
+uninstall() {
+    info "STEP 1: Removing MC instance containers"
+
+    local containers
+    containers="$(docker ps -aq --filter "label=dockercraft.instance" 2>/dev/null || true)"
+    if [[ -n "${containers}" ]]; then
+        debug "Removing containers: $(echo "${containers}" | tr '\n' ' ')"
+        # shellcheck disable=SC2086
+        docker rm -f ${containers} > /dev/null
+        success "Removed $(echo "${containers}" | wc -l) instance container(s)"
+    else
+        debug "No instance containers found"
+    fi
+
+    info "STEP 2: Stopping the manager"
+
+    if [[ -f .env ]]; then
+        docker compose --env-file .env down --remove-orphans 2> /dev/null || true
+    fi
+    docker rm -f dockercraft-api > /dev/null 2>&1 || true
+    success "Manager stopped"
+
+    info "STEP 3: Removing built images"
+
+    local images
+    images="$(docker images -q "dockercraft/minecraft" 2>/dev/null || true)"
+    if [[ -n "${images}" ]]; then
+        # shellcheck disable=SC2086
+        docker rmi -f ${images} > /dev/null 2>&1 || true
+    fi
+    docker rmi -f dockercraft-api > /dev/null 2>&1 || true
+    success "Images removed"
+
+    info "STEP 4: Removing data and configuration"
+
+    local data_dir="${ROOT_PATH}/data"
+    if [[ -f .env ]]; then
+        # shellcheck disable=SC1091
+        source .env
+        data_dir="${DOCKERCRAFT_HOST_DATA_DIR:-${data_dir}}"
+    fi
+
+    if [[ -d "${data_dir}" ]]; then
+        warn "Data dir contains ALL worlds, backups, and the manager DB: ${data_dir}"
+        read -rp "Delete it permanently? [y/N] " answer
+        if [[ "${answer,,}" == y* ]]; then
+            rm -rf "${data_dir}" 2> /dev/null \
+                || sudo rm -rf "${data_dir}"
+            success "Deleted ${data_dir}"
+        else
+            info "Keeping ${data_dir} — a future install will pick it back up."
+        fi
+    else
+        debug "No data dir at ${data_dir}"
+    fi
+
+    rm -f .env
+    success "Uninstall complete"
+}
+
 # ─── ARGUMENT PARSING ────────────────────────────────────────────────────────
 
 while [[ $# -gt 0 ]]; do
@@ -112,6 +177,8 @@ while [[ $# -gt 0 ]]; do
             echo "${SCRIPT_NAME} - ${SCRIPT_VERSION}"; exit 0 ;;
         --auto-install)
             AUTO_INSTALL=true; shift ;;
+        --uninstall)
+            UNINSTALL=true; shift ;;
         --verbose)
             VERBOSE=true; shift ;;
         *)
@@ -124,6 +191,11 @@ done
 # ─── ENTRYPOINT ──────────────────────────────────────────────────────────────
 
 cd "${ROOT_PATH}"
+
+if [[ "${UNINSTALL}" == true ]]; then
+    uninstall
+    exit 0
+fi
 
 info "STEP 1: Checking requirements"
 
