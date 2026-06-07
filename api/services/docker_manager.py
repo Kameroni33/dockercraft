@@ -5,6 +5,7 @@ re-discover them. The DB stores declared config; Docker is the source of truth
 for live status.
 """
 
+import json
 from pathlib import Path
 
 import docker
@@ -16,8 +17,10 @@ from api.config import settings
 from api.models.instance import ServerInstance
 
 LABEL = "dockercraft.instance"
+PHANTOM_LABEL = "dockercraft.phantom"
 STOP_TIMEOUT = 60  # seconds for SIGTERM → world save before SIGKILL
 MEM_OVERHEAD = 1.5  # container limit = JVM heap × this (metaspace, native, etc.)
+BEDROCK_PORT = 19132  # Bedrock default port; also the LAN discovery broadcast port
 
 
 def heap_bytes(memory: str) -> int:
@@ -64,8 +67,6 @@ def ensure_image(java_major: int) -> str:
 
 def container_config(instance: ServerInstance) -> dict:
     """Build the kwargs for containers.create() for this instance."""
-    import json
-
     ports = {
         "25565/tcp": instance.game_port,
         "25565/udp": instance.game_port,
@@ -117,9 +118,12 @@ def start(instance: ServerInstance) -> None:
         ensure_image(instance.java_major)
         container = get_client().containers.create(**container_config(instance))
     container.start()
+    if instance.lan_discovery and bedrock_host_port(instance) is not None:
+        start_phantom(instance)
 
 
 def stop(instance: ServerInstance) -> None:
+    stop_phantom(instance)  # a stopped server must not keep advertising a LAN game
     container = get_container(instance)
     if container is not None:
         container.stop(timeout=STOP_TIMEOUT)
@@ -135,6 +139,7 @@ def restart(instance: ServerInstance) -> None:
 
 def remove_container(instance: ServerInstance) -> None:
     """Stop and remove the container. Instance data on disk is untouched."""
+    remove_phantom(instance)
     container = get_container(instance)
     if container is not None:
         container.stop(timeout=STOP_TIMEOUT)
@@ -147,3 +152,86 @@ def recreate_container(instance: ServerInstance) -> None:
     remove_container(instance)
     if was_running:
         start(instance)
+
+
+# --- phantom sidecar (console LAN discovery) --------------------------------
+#
+# Bedrock consoles find servers by broadcasting a ping to UDP 19132, which never
+# traverses Docker's bridge NAT — so a Geyser port published the normal way is
+# invisible to them. phantom (github.com/jhead/phantom) answers those broadcasts
+# and proxies game traffic to the real server. It must run host-networked and
+# own UDP 19132, hence at most one phantom per host.
+
+
+def phantom_container_name(instance: ServerInstance) -> str:
+    return f"dockercraft-phantom-{instance.name}"
+
+
+def ensure_phantom_image() -> str:
+    """Return the phantom image tag, building it if absent."""
+    tag = settings.phantom_image
+    client = get_client()
+    try:
+        client.images.get(tag)
+    except ImageNotFound:
+        context = Path(__file__).resolve().parents[2] / "images" / "phantom"
+        client.images.build(
+            path=str(context),
+            buildargs={"PHANTOM_VERSION": settings.phantom_version},
+            tag=tag,
+        )
+    return tag
+
+
+def bedrock_host_port(instance: ServerInstance) -> int | None:
+    """Host port of the instance's Bedrock (Geyser) mapping, if any."""
+    for extra in json.loads(instance.extra_ports_json):
+        if extra.get("proto") == "udp" and extra["container"] == BEDROCK_PORT:
+            return extra["host"]
+    return None
+
+
+def phantom_config(instance: ServerInstance) -> dict:
+    """Build the kwargs for containers.create() for the phantom sidecar."""
+    port = bedrock_host_port(instance)
+    if port is None:
+        raise ValueError(f"instance {instance.name!r} has no Bedrock port mapping")
+    return {
+        "image": settings.phantom_image,
+        "name": phantom_container_name(instance),
+        "detach": True,
+        # Host networking: LAN discovery broadcasts can't reach a bridge-published
+        # port. The proxy port stays random — consoles auto-discover it.
+        "network_mode": "host",
+        "command": ["-server", f"127.0.0.1:{port}"],
+        "restart_policy": {"Name": "unless-stopped"},
+        "labels": {PHANTOM_LABEL: instance.name},
+    }
+
+
+def get_phantom(instance: ServerInstance) -> Container | None:
+    try:
+        return get_client().containers.get(phantom_container_name(instance))
+    except NotFound:
+        return None
+
+
+def start_phantom(instance: ServerInstance) -> None:
+    container = get_phantom(instance)
+    if container is None:
+        ensure_phantom_image()
+        container = get_client().containers.create(**phantom_config(instance))
+    container.start()
+
+
+def stop_phantom(instance: ServerInstance) -> None:
+    container = get_phantom(instance)
+    if container is not None:
+        container.stop(timeout=10)  # nothing to save; don't wait the MC 60s
+
+
+def remove_phantom(instance: ServerInstance) -> None:
+    container = get_phantom(instance)
+    if container is not None:
+        container.stop(timeout=10)
+        container.remove()
