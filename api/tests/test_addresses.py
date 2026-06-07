@@ -3,6 +3,7 @@ from api.services import network
 
 
 def test_addresses(client, fake_docker, monkeypatch):
+    monkeypatch.setattr(settings, "lan_ip", None)  # a repo-root .env may set this
     monkeypatch.setattr(network, "detect_lan_ip", lambda: "192.168.1.50")
     client.post("/api/servers", json={"name": "one", "mc_version": "1.21.1"})
     client.post("/api/servers", json={"name": "two", "mc_version": "1.21.1"})

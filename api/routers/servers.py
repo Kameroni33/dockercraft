@@ -214,8 +214,11 @@ def run_command(instance_id: int, body: CommandBody, session: SessionDep) -> dic
 
 
 @router.websocket("/{instance_id}/console")
-async def console_ws(websocket: WebSocket, instance_id: int, session: SessionDep):
-    """Interactive console: streams stdout/stderr, sends typed lines to stdin."""
+async def console_ws(
+    websocket: WebSocket, instance_id: int, session: SessionDep, tail: int = 100
+):
+    """Interactive console: streams stdout/stderr, sends typed lines to stdin.
+    ?tail= controls how much log history is replayed on connect (0 = none)."""
     await websocket.accept()
     # Router-level auth deps don't run for WebSockets — check the cookie directly.
     from api.services import auth as auth_service
@@ -230,4 +233,4 @@ async def console_ws(websocket: WebSocket, instance_id: int, session: SessionDep
     if docker_manager.status(instance) != "running":
         await websocket.close(code=4409, reason=f"instance {instance.name!r} is not running")
         return
-    await console.bridge_console(websocket, instance)
+    await console.bridge_console(websocket, instance, tail=max(0, min(tail, 1000)))
