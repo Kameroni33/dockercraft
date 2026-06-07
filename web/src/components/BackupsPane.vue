@@ -16,7 +16,16 @@ const notice = ref("");
 const busy = ref(false);
 const policy = ref<BackupPolicy>({ enabled: false, interval_hours: 6, keep_count: 10, keep_days: 0 });
 
-const load = async () => (backups.value = await api.backups.listFor(props.id));
+async function load() {
+  const [list, server] = await Promise.all([api.backups.listFor(props.id), api.servers.get(props.id)]);
+  backups.value = list;
+  policy.value = {
+    enabled: server.backup_enabled,
+    interval_hours: server.backup_interval_hours,
+    keep_count: server.backup_keep_count,
+    keep_days: server.backup_keep_days,
+  };
+}
 onMounted(load);
 
 async function act(fn: () => Promise<unknown>) {
