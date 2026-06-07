@@ -35,6 +35,10 @@ class ServerInstance(SQLModel, table=True):
     cpus: float = 0  # CPU cores cap; 0 = unlimited
     jvm_flags: str = ""
 
+    # Run a phantom sidecar so consoles (Switch/Xbox/PS) discover this server as
+    # a LAN game. At most one instance per host (phantom owns UDP 19132).
+    lan_discovery: bool = False
+
     # Backup policy (0 = unlimited for keep_*; pruning never touches manual backups)
     backup_enabled: bool = False
     backup_interval_hours: int = 6
@@ -66,5 +70,6 @@ class InstanceRead(SQLModel):
     memory: str
     cpus: float
     jvm_flags: str
+    lan_discovery: bool
     created_at: datetime
     status: str  # computed from docker, attached by the router

@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     # Custom MC server image (tagged per Java major, e.g. dockercraft/minecraft:java21).
     mc_image_repo: str = "dockercraft/minecraft"
 
+    # phantom sidecar (console LAN discovery for Bedrock/Geyser instances).
+    phantom_image: str = "dockercraft/phantom:latest"
+    phantom_version: str = "0.5.4"  # must match the sha256 pin in images/phantom/Dockerfile
+    # When LAN discovery is enabled, an instance's Bedrock host port is moved out
+    # of 19132 (phantom needs it for discovery broadcasts) into this range.
+    bedrock_remap_range: tuple[int, int] = (19133, 19232)
+
     # LAN IP players connect to. Auto-detected when unset; must be set explicitly
     # when the manager runs in a container (detection would find the bridge IP).
     lan_ip: str | None = None

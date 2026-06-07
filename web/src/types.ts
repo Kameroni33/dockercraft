@@ -14,6 +14,7 @@ export interface Instance {
   extra_ports_json: string;
   memory: string;
   jvm_flags: string;
+  lan_discovery: boolean;
   created_at: string;
   status: string; // running | exited | created | not_created | ...
 }
