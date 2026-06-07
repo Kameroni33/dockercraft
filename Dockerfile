@@ -1,50 +1,26 @@
-FROM openjdk:21-jdk-slim
+# dockercraft manager (FastAPI + built Vue UI)
 
-# Create non-root user with UID 1000
-RUN useradd -u 1000 -m -d /home/mcuser mcuser
+# Stage 1: build the web UI (so hosts don't need node)
+FROM node:22-alpine AS web
+WORKDIR /build
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web ./
+RUN npm run build
 
-# Create Minecraft working directory
-RUN mkdir -p /minecraft
+# Stage 2: the manager
+FROM python:3.13-slim
 
-# Ensure correct ownership of server files
-RUN chown -R mcuser:mcuser /minecraft
+WORKDIR /app
+COPY pyproject.toml ./
+COPY api ./api
+RUN pip install --no-cache-dir .
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    cron \
-    supervisor \
-    && rm -rf /var/lib/apt/lists/*
+# MC image build context (ensure_image builds per-Java-major tags on demand)
+COPY images ./images
+COPY --from=web /build/dist ./web/dist
 
-# Copy startup script
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-
-# Copy backup script
-COPY backup.sh /backup.sh
-RUN chmod +x /backup.sh
-
-# Switch to non-root user
-USER mcuser
-
-# Set working directory
-WORKDIR /minecraft
-
-# Accept EULA automatically
-RUN echo "eula=true" > eula.txt
-
-# Expose Minecraft server port
-EXPOSE 25565
-
-# Create a named pipe for server commands
-RUN mkfifo /minecraft/fifo
-
-# Add cron job for daily backups
-RUN echo "0 0 * * * /backup.sh >> /minecraft/logs/backup.log 2>&1" | crontab -
-RUN (echo "0 0 * * * /backup.sh") | crontab -
-
-# Copy supervisor config and set entrypoint
-COPY supervisord.conf /etc/supervisor/supervisord.conf
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
-
-# Set entrypoint
-#ENTRYPOINT ["/start.sh"]
+# Runs with network_mode: host (see compose.yml): reaches host-bound RCON
+# ports, detects the real LAN IP, and serves on the host port directly.
+# compose overrides the port from .env (DOCKERCRAFT_PORT).
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "25800"]

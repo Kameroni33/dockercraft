@@ -1,144 +1,289 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-# === CONFIG ===
+# ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
-CACHE=".cache"
-BIN="/usr/local/bin"
-JAR="server.jar"
+SCRIPT_NAME="dockercraft Installation Script"
+SCRIPT_VERSION="1.0.0"
 
-MCUTILS_URL="https://mcutils.com"
+AUTO_INSTALL=false
+UNINSTALL=false
+VERBOSE=false
 
-SERVER_NAME="dockercraft"
-SERVER_PATH="./server"
+ROOT_PATH="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
-REMOVE=(
-  "logs"
-  "cache"
-  "debug"
-  "config"
-  "libraries"
-  "supervisord.log"
-  "supervisord.pid"
-  "usercache.json"
-  "version_history.json"
-  "help.yml"
-  "commands.yml"
-  "permissions.yml"
-  "bukkit.yml"
-  "spigot.yml"
-  ".cache"
-  ".fabric"
-)
+# Default manager UI/API port. Deliberately uncommon; the installer walks up
+# from here if it happens to be taken. Kept clear of the MC instance port
+# ranges (game 25565-25664, RCON 25665-25764).
+DEFAULT_PORT=25800
 
-SEED="" # random
+# ─── ENVIRONMENT ─────────────────────────────────────────────────────────────
 
-echo "Welcome to the Minecraft Server Installer!"
+# Color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# === CHECK DEPENDENCIES ===
+# ─── LOGGING ─────────────────────────────────────────────────────────────────
 
-for cmd in curl jq docker docker-compose; do
-  if ! command -v $cmd &> /dev/null; then
-    echo "Missing dependency: $cmd"
-    exit 1
-  fi
-done
+error() {
+    echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR |${NC} $1" >&2
+}
 
-# === CHECK OVERWRITE ===
+warn() {
+    echo -e "${YELLOW}[$(date +'%Y-%m-%d %H:%M:%S')] WARN  |${NC} $1"
+}
 
-if docker ps --format '{{.Names}}' | grep -q "^${SERVER_NAME}$"; then
-  echo "Warning: A minecraft server '$SERVER_NAME' already exists ."
-  read -p "Do you want to delete it and reset the server? [y/N] " stopit
-  if [[ "$stopit" =~ ^[Yy]$ ]]; then
-    echo "Stopping container $SERVER_NAME..."
-    docker stop "$SERVER_NAME"
-    echo "Removing container $SERVER_NAME..."
-    docker rm "$SERVER_NAME"
+info() {
+    echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')] INFO  |${NC} $1"
+}
 
-    for item in "${REMOVE[@]}"; do
-      path="$SERVER_PATH/$item"
-      if [ -e "$path" ]; then
-        echo "Removing $path..."
-        rm -rf "$path"
-      fi
+debug() {
+    [ "${VERBOSE:-false}" = false ] && return
+    echo -e "${CYAN}[$(date +'%Y-%m-%d %H:%M:%S')] DEBUG |${NC} $1"
+}
+
+success() {
+    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] INFO  |${NC} $1"
+}
+
+# ─── HELP ────────────────────────────────────────────────────────────────────
+
+help() {
+    cat << EOF
+TITLE
+    ${SCRIPT_NAME} (${SCRIPT_VERSION})
+
+DESCRIPTION
+    One-shot setup of the dockercraft manager on a Linux host.  Checks for
+    Docker, generates .env (data dir, LAN IP, port, docker GID), then builds
+    and starts the manager via docker compose.  Idempotent — re-run after a
+    'git pull' to update.
+
+USAGE
+    $(basename "${BASH_SOURCE[0]}") [OPTIONS]
+
+OPTIONS
+    -h, --help              Show this help message and exit
+    -v, --version           Show script version and exit
+        --verbose           Detailed output for debugging
+        --auto-install      Allow the script to automatically install Docker
+                            (via get.docker.com) if it is missing
+        --uninstall         Remove everything dockercraft created: MC instance
+                            containers, the manager, built images, and .env.
+                            Prompts separately before deleting the data dir
+                            (worlds, backups, manager DB).
+
+EOF
+}
+
+# ─── FUNCTIONS ───────────────────────────────────────────────────────────────
+
+check_command() {
+    command -v "$1" > /dev/null 2>&1
+}
+
+install_docker() {
+    debug "Installing Docker via get.docker.com convenience script..."
+    curl -fsSL https://get.docker.com | sh
+    success "Installed docker"
+    warn "To use docker as non-root: sudo usermod -aG docker \${USER}, then re-login."
+}
+
+find_free_port() {
+    local port="$1"
+    while ss -tln 2>/dev/null | grep -q ":${port} "; do
+        debug "Port ${port} is taken — trying $((port + 1))"
+        port=$((port + 1))
     done
+    echo "${port}"
+}
 
-  else
-    echo "Preserving existing server & configuration."
-  fi
-fi
+detect_lan_ip() {
+    ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || echo ""
+}
 
-if [ -d "$SERVER_PATH/world" ] || [ -d "$SERVER_PATH/world_nether" ] || [ -d "$SERVER_PATH/world_the_end" ]; then
-  echo "Warning: Existing Minecraft world data was found."
-  read -p "Do you want to overwrite it? [y/N] " confirm
-  if [[ "$confirm" =~ ^[Yy]$ ]]; then
-    echo "Removing existing world directory..."
-    rm -rf "$SERVER_PATH/world" "$SERVER_PATH/world_nether" "$SERVER_PATH/world_the_end"
-    sed -i "s/^level-seed=.*/level-seed=$SEED/" "$SERVER_PATH/server.properties"
-  else
-    echo "Preserving existing world data."
-  fi
-fi
+uninstall() {
+    info "STEP 1: Removing MC instance containers"
 
-if [ -d "$SERVER_PATH/plugins" ] || [ -d "$SERVER_PATH/mods" ]; then
-  echo "Warning: Existing plugins/mods were found."
-  read -p "Do you want to delete them? [y/N] " confirm
-  if [[ "$confirm" =~ ^[Yy]$ ]]; then
-    echo "Removing existing plugins/mods..."
-    rm -rf "$SERVER_PATH/plugins" "$SERVER_PATH/mods"
-  else
-    echo "Preserving existing plugins/mods."
-  fi
-fi
+    local containers
+    containers="$(docker ps -aq --filter "label=dockercraft.instance" 2>/dev/null || true)"
+    if [[ -n "${containers}" ]]; then
+        debug "Removing containers: $(echo "${containers}" | tr '\n' ' ')"
+        # shellcheck disable=SC2086
+        docker rm -f ${containers} > /dev/null
+        success "Removed $(echo "${containers}" | wc -l) instance container(s)"
+    else
+        debug "No instance containers found"
+    fi
 
-# === FETCH LOADER & VERSIONS ===
+    info "STEP 2: Stopping the manager"
 
-echo "Fetching supported loaders from mcutils..."
-LOADERS=$(curl -s "$MCUTILS_URL/api/server-jars" | jq -r '.[].key')
+    if [[ -f .env ]]; then
+        docker compose --env-file .env down --remove-orphans 2> /dev/null || true
+    fi
+    docker rm -f dockercraft-api > /dev/null 2>&1 || true
+    success "Manager stopped"
 
-echo "Available loaders:"
-select LOADER in $LOADERS; do
-  if [ -n "$LOADER" ]; then break; fi
+    info "STEP 3: Removing built images"
+
+    local images
+    images="$(docker images -q "dockercraft/minecraft" 2>/dev/null || true)"
+    if [[ -n "${images}" ]]; then
+        # shellcheck disable=SC2086
+        docker rmi -f ${images} > /dev/null 2>&1 || true
+    fi
+    docker rmi -f dockercraft-api > /dev/null 2>&1 || true
+    success "Images removed"
+
+    info "STEP 4: Removing data and configuration"
+
+    local data_dir="${ROOT_PATH}/data"
+    if [[ -f .env ]]; then
+        # shellcheck disable=SC1091
+        source .env
+        data_dir="${DOCKERCRAFT_HOST_DATA_DIR:-${data_dir}}"
+    fi
+
+    if [[ -d "${data_dir}" ]]; then
+        warn "Data dir contains ALL worlds, backups, and the manager DB: ${data_dir}"
+        read -rp "Delete it permanently? [y/N] " answer
+        if [[ "${answer,,}" == y* ]]; then
+            rm -rf "${data_dir}" 2> /dev/null \
+                || sudo rm -rf "${data_dir}"
+            success "Deleted ${data_dir}"
+        else
+            info "Keeping ${data_dir} — a future install will pick it back up."
+        fi
+    else
+        debug "No data dir at ${data_dir}"
+    fi
+
+    rm -f .env
+    success "Uninstall complete"
+}
+
+# ─── ARGUMENT PARSING ────────────────────────────────────────────────────────
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --help|-h)
+            help; exit 0 ;;
+        --version|-v)
+            echo "${SCRIPT_NAME} - ${SCRIPT_VERSION}"; exit 0 ;;
+        --auto-install)
+            AUTO_INSTALL=true; shift ;;
+        --uninstall)
+            UNINSTALL=true; shift ;;
+        --verbose)
+            VERBOSE=true; shift ;;
+        *)
+            error "Unknown option '$1'"
+            error "Run '${BASH_SOURCE[0]} --help' for usage information"
+            exit 1 ;;
+    esac
 done
 
-echo "Fetching supported versions of $LOADER..."
-VERSIONS=$(curl -s "$MCUTILS_URL/api/server-jars/$LOADER" | jq -r '.[].version')
+# ─── ENTRYPOINT ──────────────────────────────────────────────────────────────
 
-echo "Available versions:"
-select VERSION in $VERSIONS; do
-  if [ -n "$VERSION" ]; then break; fi
-done
+cd "${ROOT_PATH}"
 
-mkdir -p "$CACHE/$LOADER/$VERSION"
+if [[ "${UNINSTALL}" == true ]]; then
+    uninstall
+    exit 0
+fi
 
-echo "Downloading $LOADER $VERSION..."
-JAR_URL=$(curl -s "$MCUTILS_URL/api/server-jars/$LOADER/$VERSION" | jq -r '.downloadUrl')
-curl -L "$JAR_URL" -o "$CACHE/$LOADER/$VERSION/$JAR"
+info "STEP 1: Checking requirements"
 
-rm "$JAR"
-cp "$CACHE/$LOADER/$VERSION/$JAR" "$JAR"
+if ! check_command docker; then
+    if [[ "${AUTO_INSTALL}" == true ]]; then
+        install_docker
+    else
+        error "Docker is missing.  Re-run with --auto-install, or install it manually:"
+        error "    https://docs.docker.com/engine/install/"
+        exit 1
+    fi
+fi
 
-# === SERVER SETUP ===
+if ! docker info > /dev/null 2>&1; then
+    error "Cannot talk to the Docker daemon."
+    error "Try: sudo usermod -aG docker \${USER}  (then log out and back in)"
+    exit 1
+fi
 
-chmod +x "$JAR"
-chmod +x mcctl.sh
+if ! docker compose version > /dev/null 2>&1; then
+    error "The docker compose plugin is missing (docker-compose-plugin package)."
+    exit 1
+fi
 
-echo "Installing utility 'mcctl'..."
-cp mcctl.sh "$BIN/mcctl"
+success "All requirements met"
 
-if [ ! -p fifo ]; then
-  echo "Creating FIFO pipe..."
-  mkfifo fifo
-  chmod 666 fifo
+info "STEP 2: Setting up environment variables"
+
+if [[ ! -f .env ]]; then
+    debug "Detecting LAN IP, free port, and docker socket GID"
+    DATA_DIR="${ROOT_PATH}/data"
+    LAN_IP="$(detect_lan_ip)"
+    PORT="$(find_free_port "${DEFAULT_PORT}")"
+    DOCKER_GID="$(stat -c %g /var/run/docker.sock 2>/dev/null || echo 0)"
+
+    cat > .env << EOF
+# Absolute host path for all instance data, backups, and the manager DB.
+DOCKERCRAFT_HOST_DATA_DIR=${DATA_DIR}
+# LAN IP shown to players / used for port-forward hints (auto-detected).
+DOCKERCRAFT_LAN_IP=${LAN_IP}
+# Manager UI/API port (first free port >= ${DEFAULT_PORT} at install time).
+DOCKERCRAFT_PORT=${PORT}
+# Group owning /var/run/docker.sock (manager container joins it).
+DOCKER_GID=${DOCKER_GID}
+EOF
+    success "Created .env"
 else
-  echo "FIFO pipe already exists."
+    debug ".env already exists — skipping."
 fi
 
-# === START SERVER ===
+# shellcheck disable=SC1091
+source .env
 
-echo "Building and starting the Minecraft server..."
-docker-compose down
-docker-compose up --build -d
+info "STEP 3: Preparing data directory"
 
-echo "Setup complete! Use 'mcctl' utility to manage your server."
+mkdir -p "${DOCKERCRAFT_HOST_DATA_DIR}"
+
+# The manager container and MC containers both run as uid 1000 — the data dir
+# must be writable by that uid.
+OWNER="$(stat -c %u "${DOCKERCRAFT_HOST_DATA_DIR}")"
+if [[ "${OWNER}" != "1000" ]]; then
+    warn "Data dir is owned by uid ${OWNER} — changing to uid 1000 (needs sudo)"
+    sudo chown -R 1000:1000 "${DOCKERCRAFT_HOST_DATA_DIR}"
+fi
+
+success "Data directory ready: ${DOCKERCRAFT_HOST_DATA_DIR}"
+
+info "STEP 4: Building and starting the manager"
+
+debug "docker compose up -d --build (first build takes a few minutes)"
+docker compose up -d --build
+
+info "STEP 5: Waiting for the manager to come up"
+
+PORT="${DOCKERCRAFT_PORT:-${DEFAULT_PORT}}"
+for _ in $(seq 1 30); do
+    if curl -fsS "http://localhost:${PORT}/api/health" > /dev/null 2>&1; then
+        IP_HINT="${DOCKERCRAFT_LAN_IP:-$(hostname -I | awk '{print $1}')}"
+        success "dockercraft is running!"
+        echo
+        echo "    Open:   http://${IP_HINT}:${PORT}"
+        echo "    First visit creates the admin account."
+        echo
+        echo "    Manage: docker compose logs -f   |   docker compose down"
+        exit 0
+    fi
+    sleep 2
+done
+
+error "Manager did not become healthy — check: docker compose logs"
+exit 1

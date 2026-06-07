@@ -1,12 +1,22 @@
-# JetBrains IDE
-.idea
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
 
-# Server folders & files
-/server
-/backups
-/logs
-/fifo
-server.jar
+# IDE
+.idea/
+.vscode/
 
-# Cache
-.cache
+# Runtime data (worlds, backups, jars, sqlite db)
+data/
+*.db
+
+# Env
+.env
+
+# Frontend (when web/ lands)
+node_modules/
+web/dist/

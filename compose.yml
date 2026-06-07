@@ -1,0 +1,25 @@
+services:
+  api:
+    build: .
+    container_name: dockercraft-api
+    # Host networking: the manager must reach MC containers' host-bound RCON
+    # ports (127.0.0.1:25665+), detect the real LAN IP, and serve the UI on
+    # host port 8080. MC instances are sibling containers on the default
+    # bridge with their own published ports.
+    network_mode: host
+    # uid 1000 to match the MC containers' `minecraft` user — both sides read/
+    # write the same bind-mounted instance dirs. docker group for the socket.
+    user: "1000:1000"
+    group_add:
+      - "${DOCKER_GID:?set in .env (created by install.sh)}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKERCRAFT_HOST_DATA_DIR:?set in .env (absolute path, created by install.sh)}:/app/data
+    environment:
+      DOCKERCRAFT_DATA_DIR: /app/data
+      # Host path of the data dir — MC containers are siblings created via the
+      # host socket, so their bind mounts must use host paths.
+      DOCKERCRAFT_HOST_DATA_DIR: ${DOCKERCRAFT_HOST_DATA_DIR}
+      DOCKERCRAFT_LAN_IP: ${DOCKERCRAFT_LAN_IP:-}
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "${DOCKERCRAFT_PORT:-25800}"]
+    restart: unless-stopped
