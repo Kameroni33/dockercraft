@@ -92,6 +92,9 @@ install.sh        first-time host setup (docker, dirs, compose up)
 - [x] Resource limits per instance (RAM/CPU caps — workstation has modest specs)
 - [x] Auth for the manager (first-run admin setup, scrypt + HMAC cookie sessions)
 - [x] Bind RCON host ports to 127.0.0.1 only
+- [x] MC version upgrades: pre-flight mod-compatibility check, mandatory
+      pre_upgrade backup, mod migration, post-boot health check w/ diagnosis
+      and one-click rollback
 - [ ] AWS/cloud deployment story (deferred)
 - [ ] Other loaders: Forge / NeoForge / Paper (deferred)
 - [ ] **Real DB migrations (alembic).** init_db's auto-add-columns is additive-only:
@@ -169,3 +172,19 @@ Vanilla-feel Fabric server for Kameron's brother + friends, **cross-platform**
   deploy on dev box via install.sh — auth, server boot, RCON, hot backup.
   67 tests green. NEXT: real deployment on the Dell workstation, bug cleanup,
   then merge vibe-ui -> main.
+- 2026-10-09: **Version upgrades.** Three bounded endpoints (preflight /
+  upgrade / health-check) + an Upgrade tab that chains them; Resources editor
+  finally exposes memory/cpus/jvm_flags in the UI. Upgrade always takes a
+  pre_upgrade backup (non-prunable) on the OLD version, re-provisions, moves
+  every mod to a build for the target, installs newly-required deps, and
+  disables mods with no build only when explicitly forced. Backup gained
+  mods_json so restore/clone re-sync the mod rows with the archived jars —
+  without it a rollback left the DB claiming versions the jars weren't.
+  Verified live end-to-end: 1.21.1 -> 26.3 Fabric, Java 21 -> 25 (image
+  auto-built), Fabric API/Lithium/Sodium migrated, world booted clean in 9s;
+  crash paths exercised with a 16M heap (OOM-killed -> correct advice) and
+  verified the crash loop is stopped so it can be read. Gotchas worth
+  remembering: containers run restart_policy unless-stopped, so a crash LOOP
+  still reports status "running" (watch RestartCount); and a container's log
+  survives restarts, so judging a boot needs `since` scoping or a previous
+  run's "Done" line reads as success. 93 tests green.
