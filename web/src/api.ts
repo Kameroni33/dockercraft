@@ -2,6 +2,7 @@ import type {
   Addresses,
   Backup,
   BackupPolicy,
+  HealthCheck,
   Instance,
   InstalledMod,
   McVersion,
@@ -9,15 +10,27 @@ import type {
   ModUpdate,
   OpEntry,
   Player,
+  Preflight,
   PropertiesPatch,
   SetupRequest,
+  UpgradeResult,
   WhitelistEntry,
 } from "./types";
+
+export interface UpgradeRequest {
+  mc_version: string; // "latest" or an explicit id
+  loader_version?: string | null;
+  memory?: string | null;
+  disable_incompatible?: boolean;
+}
 
 export class ApiError extends Error {
   constructor(
     public status: number,
     detail: string,
+    // Raw `detail` when the API returns a structured one (e.g. a blocked
+    // upgrade hands back the full pre-flight report alongside the message).
+    public data?: unknown,
   ) {
     super(detail);
   }
@@ -34,13 +47,17 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
       location.hash = "#/login"; // session missing/expired -> login screen
     }
     let detail = resp.statusText;
+    let raw: unknown;
     try {
       const data = await resp.json();
-      detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+      raw = data.detail;
+      if (typeof data.detail === "string") detail = data.detail;
+      else if (data.detail?.message) detail = data.detail.message;
+      else detail = JSON.stringify(data.detail);
     } catch {
       /* non-JSON error body */
     }
-    throw new ApiError(resp.status, detail);
+    throw new ApiError(resp.status, detail, raw);
   }
   if (resp.status === 204) return undefined as T;
   return resp.json();
@@ -84,6 +101,16 @@ export const api = {
       req<void>("DELETE", `/servers/${id}/ops/${encodeURIComponent(username)}`),
     setExtraPorts: (id: number, ports: { host: number; container: number; proto: string }[]) =>
       req<{ extra_ports: unknown[] }>("PUT", `/servers/${id}/extra-ports`, ports),
+    patchResources: (id: number, body: { memory?: string; cpus?: number; jvm_flags?: string }) =>
+      req<Instance>("PATCH", `/servers/${id}`, body),
+    upgradePreflight: (id: number, body: UpgradeRequest) =>
+      req<Preflight>("POST", `/servers/${id}/upgrade/preflight`, body),
+    // Slow: backup + downloads + possibly an image build. Minutes, not seconds.
+    upgrade: (id: number, body: UpgradeRequest) =>
+      req<UpgradeResult>("POST", `/servers/${id}/upgrade`, body),
+    // Blocks server-side until the server reports Done, crashes, or times out.
+    healthCheck: (id: number, body: { timeout?: number; rollback_backup_id?: number }) =>
+      req<HealthCheck>("POST", `/servers/${id}/health-check`, body),
     consoleUrl(id: number, tail = 100): string {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       return `${proto}://${location.host}/api/servers/${id}/console?tail=${tail}`;

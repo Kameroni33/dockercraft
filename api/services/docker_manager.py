@@ -138,12 +138,20 @@ def state(instance: ServerInstance) -> dict:
     }
 
 
-def logs(instance: ServerInstance, tail: int = 200) -> str:
-    """Recent container output (stdout+stderr), empty if there's no container."""
+def logs(instance: ServerInstance, tail: int = 200, since: int | None = None) -> str:
+    """Recent container output (stdout+stderr), empty if there's no container.
+
+    since (unix seconds) restricts output to lines logged after that moment.
+    A container's log survives restarts, so anything judging a *particular*
+    boot must scope to it — otherwise a previous run's lines are still there.
+    """
     container = get_container(instance)
     if container is None:
         return ""
-    return container.logs(tail=tail).decode(errors="replace")
+    kwargs: dict = {"tail": tail}
+    if since is not None:
+        kwargs["since"] = since
+    return container.logs(**kwargs).decode(errors="replace")
 
 
 def start(instance: ServerInstance) -> None:

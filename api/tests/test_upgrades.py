@@ -345,18 +345,32 @@ def test_rollback_restores_version_and_mod_rows(client, fake_upstreams, session)
 
 @pytest.fixture
 def fake_boot(monkeypatch):
-    """Drive docker_manager.state/logs from a scripted sequence of ticks."""
+    """Drive docker_manager.state/logs from a scripted sequence of ticks.
+
+    `stale` stands in for output from an EARLIER run of the same container,
+    which docker keeps across restarts: it is returned only when the caller
+    forgets to scope the read with `since`.
+    """
     monkeypatch.setattr(upgrades, "POLL_INTERVAL", 0)
     monkeypatch.setattr(instances, "start_instance", lambda i: None)
-    script: list[tuple[dict, str]] = []
+
+    class Script(list):
+        """A tick script that also carries the container's pre-existing log."""
+
+        def __init__(self):
+            super().__init__()
+            self.stale = {"text": ""}
+
+    script = Script()
+    stale = script.stale
 
     def state(instance):
         return script[min(len(script) - 1, state.tick)][0]
 
-    def logs(instance, tail=200):
+    def logs(instance, tail=200, since=None):
         entry = script[min(len(script) - 1, state.tick)][1]
         state.tick += 1
-        return entry
+        return entry if since is not None else stale["text"] + entry
 
     state.tick = 0
     monkeypatch.setattr(docker_manager, "state", state)
@@ -421,6 +435,52 @@ def test_health_check_out_of_memory_recommends_more_heap(client, fake_upstreams,
     assert result["healthy"] is False
     recs = " ".join(f["recommendation"] for f in result["findings"])
     assert "memory limit" in recs
+
+
+def test_health_check_ignores_a_previous_boots_done_line(client, fake_upstreams, fake_boot):
+    """Docker keeps a container's log across restarts. Judging this boot by a
+    'Done' line the LAST boot wrote reports success on a server that never
+    came up — so the read has to be scoped to the current start."""
+    sid = _server(client)
+    fake_boot.stale["text"] = 'Done (2.522s)! For help, type "help"\n'  # earlier run
+    fake_boot.append((RUNNING, "Preparing spawn area: 12%"))
+
+    result = client.post(f"/api/servers/{sid}/health-check", json={"timeout": 10}).json()
+    assert result["verdict"] == "timeout" and result["healthy"] is False
+
+
+def test_health_check_tiny_heap_recommends_more_memory(client, fake_upstreams, fake_boot):
+    sid = _server(client)
+    fake_boot.append(
+        (
+            {**RUNNING, "status": "exited", "exit_code": 1},
+            "Error occurred during initialization of VM\nToo small initial heap",
+        )
+    )
+    result = client.post(f"/api/servers/{sid}/health-check", json={"timeout": 30}).json()
+
+    assert result["verdict"] == "exited"
+    assert "heap size" in " ".join(f["reason"] for f in result["findings"])
+
+
+def test_silent_death_is_blamed_on_the_jvm(client, fake_upstreams, fake_boot, fake_docker):
+    """Seen live with a 16M heap: the container logs one line and dies, with
+    the JVM's own complaint never reaching stdout."""
+    sid = _server(client)
+    fake_boot += [
+        (RUNNING, "Starting net.fabricmc.loader.impl.game.minecraft.BundlerClassPathCapture"),
+        (
+            {**RUNNING, "restart_count": 1},
+            "Starting net.fabricmc.loader.impl.game.minecraft.BundlerClassPathCapture",
+        ),
+    ]
+    result = client.post(
+        f"/api/servers/{sid}/health-check", json={"timeout": 30, "rollback_backup_id": 1}
+    ).json()
+
+    assert result["verdict"] == "crash_loop"
+    assert "JVM itself failed to start" in " ".join(f["reason"] for f in result["findings"])
+    assert result["rollback"]["backup_id"] == 1
 
 
 def test_health_check_timeout_is_inconclusive(client, fake_upstreams, fake_boot):

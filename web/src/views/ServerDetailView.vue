@@ -10,14 +10,20 @@ import PropertiesEditor from "../components/PropertiesEditor.vue";
 import PlayersPane from "../components/PlayersPane.vue";
 import ModsPane from "../components/ModsPane.vue";
 import BackupsPane from "../components/BackupsPane.vue";
+import ResourcesEditor from "../components/ResourcesEditor.vue";
+import UpgradePane from "../components/UpgradePane.vue";
 
 const props = defineProps<{ id: number }>();
 const router = useRouter();
 
 const server = ref<Instance | null>(null);
 const error = ref("");
-const tab = ref<"console" | "settings" | "players" | "mods" | "backups">("console");
+const tab = ref<"console" | "settings" | "players" | "mods" | "backups" | "upgrade">("console");
 const busy = ref(false);
+
+async function refresh() {
+  server.value = await api.servers.get(props.id);
+}
 
 usePolling(async () => {
   try {
@@ -89,12 +95,17 @@ async function destroy() {
       <button :class="{ active: tab === 'players' }" @click="tab = 'players'">Players</button>
       <button v-if="server.loader === 'fabric'" :class="{ active: tab === 'mods' }" @click="tab = 'mods'">Mods</button>
       <button :class="{ active: tab === 'backups' }" @click="tab = 'backups'">Backups</button>
+      <button :class="{ active: tab === 'upgrade' }" @click="tab = 'upgrade'">Upgrade</button>
     </div>
 
     <ConsolePane v-if="tab === 'console'" :id="id" :running="server.status === 'running'" />
-    <PropertiesEditor v-else-if="tab === 'settings'" :id="id" :running="server.status === 'running'" />
+    <template v-else-if="tab === 'settings'">
+      <ResourcesEditor :server="server" @changed="refresh" />
+      <PropertiesEditor :id="id" :running="server.status === 'running'" />
+    </template>
     <PlayersPane v-else-if="tab === 'players'" :id="id" />
     <ModsPane v-else-if="tab === 'mods'" :id="id" :mc-version="server.mc_version" :running="server.status === 'running'" />
     <BackupsPane v-else-if="tab === 'backups'" :id="id" />
+    <UpgradePane v-else-if="tab === 'upgrade'" :server="server" @changed="refresh" />
   </template>
 </template>

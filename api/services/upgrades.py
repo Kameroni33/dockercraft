@@ -409,9 +409,21 @@ CRASH_SIGNATURES: list[tuple[re.Pattern, str, str]] = [
         "the pre-upgrade backup.",
     ),
     (
-        re.compile(r"Could not find or load main class|Unable to access jarfile"),
-        "The server jar is missing or unreadable.",
+        re.compile(
+            r"Could not find or load main class|Unable to access jarfile"
+            r"|Invalid or corrupt jarfile"
+        ),
+        "The server jar is missing, truncated or unreadable.",
         "Provisioning didn't complete. Re-run the upgrade, or restore the backup.",
+    ),
+    (
+        re.compile(
+            r"Too small initial heap|Could not create the Java Virtual Machine"
+            r"|Invalid maximum heap size|Error occurred during initialization of VM"
+        ),
+        "The JVM refused to start with the configured heap size.",
+        "The memory setting is too small (or malformed) for this server. Raise it "
+        "in Settings — 4G is a sane floor for a modded 1.21+ world.",
     ),
 ]
 
@@ -430,6 +442,19 @@ def diagnose(log_text: str, state: dict) -> list[dict]:
     for pattern, reason, recommendation in CRASH_SIGNATURES:
         if pattern.search(log_text):
             findings.append({"reason": reason, "recommendation": recommendation})
+    # Observed with an unusable heap size: the JVM exits before the server logs
+    # anything, and the launcher's own error never reaches the container's
+    # stdout. An all-but-empty log is itself the clue.
+    if not findings and len(log_text.strip().splitlines()) <= 3:
+        findings.append(
+            {
+                "reason": "The server died before producing any output — the JVM "
+                "itself failed to start.",
+                "recommendation": "Almost always the memory setting or a bad JVM "
+                "flag. Check both in Settings (a heap under ~1G can't launch a "
+                "Minecraft server at all), then start again.",
+            }
+        )
     return findings
 
 
@@ -445,7 +470,11 @@ def health_check(
     Blocking by design — it is the caller's progress bar.
     """
     baseline = docker_manager.state(instance)["restart_count"]
+    # A container's log outlives its restarts, so a previous boot's "Done" line
+    # is still sitting there. Scope to this boot or we'd pass instantly on it.
+    since: int | None = None
     if docker_manager.status(instance) != "running":
+        since = int(time.time()) - 1
         instances.start_instance(instance)
 
     started = time.monotonic()
@@ -453,7 +482,7 @@ def health_check(
     while time.monotonic() - started < timeout:
         time.sleep(POLL_INTERVAL)
         state = docker_manager.state(instance)
-        log_text = docker_manager.logs(instance, tail=400)
+        log_text = docker_manager.logs(instance, tail=400, since=since)
 
         if DONE_RE.search(log_text):
             verdict = "healthy"
@@ -467,7 +496,7 @@ def health_check(
             verdict = "exited"
             break
 
-    log_text = docker_manager.logs(instance, tail=400)
+    log_text = docker_manager.logs(instance, tail=400, since=since)
     healthy = verdict == "healthy"
     result = {
         "verdict": verdict,

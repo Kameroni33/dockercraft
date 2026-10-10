@@ -13,6 +13,7 @@ export interface Instance {
   rcon_port: number;
   extra_ports_json: string;
   memory: string;
+  cpus: number; // CPU core cap; 0 = unlimited
   jvm_flags: string;
   backup_enabled: boolean;
   backup_interval_hours: number;
@@ -80,7 +81,7 @@ export interface Backup {
   filename: string;
   path: string; // absolute path on the docker host, for manual inspection
   size_bytes: number;
-  kind: "manual" | "scheduled" | "pre_restore";
+  kind: "manual" | "scheduled" | "pre_restore" | "pre_upgrade";
   note: string;
   created_at: string;
 }
@@ -135,4 +136,66 @@ export interface McVersion {
 export interface PropertiesPatch {
   properties: Record<string, string>;
   restart_required: boolean;
+}
+
+// --- version upgrades ------------------------------------------------------
+
+export interface ModPlanEntry {
+  project_id: string;
+  slug: string;
+  title: string;
+  enabled: boolean;
+  installed: string;
+  available: string | null;
+  // blocked = enabled with no build for the target; skipped = same but disabled
+  status: "ok" | "blocked" | "skipped" | "unknown";
+  available_version_id?: string;
+  detail?: string;
+}
+
+export interface Preflight {
+  current_version: string;
+  target_version: string;
+  loader: Loader;
+  ready: boolean;
+  blockers: string[];
+  warnings: string[];
+  mods: ModPlanEntry[];
+  java?: { current: number; target: number; changed: boolean; image_build_required: boolean };
+  loader_version?: { current: string | null; target: string };
+}
+
+export interface UpgradeResult {
+  from_version: string;
+  to_version: string;
+  backup_id: number;
+  was_running: boolean;
+  preflight: Preflight;
+  java_major: number;
+  loader_version: string | null;
+  memory: string;
+  mods: {
+    updated: { title: string; version: string }[];
+    unchanged: string[];
+    disabled: string[];
+    added: string[];
+  };
+}
+
+export interface HealthFinding {
+  reason: string;
+  recommendation: string;
+}
+
+export interface HealthCheck {
+  verdict: "healthy" | "crash_loop" | "exited" | "timeout";
+  healthy: boolean;
+  summary: string;
+  elapsed_seconds: number;
+  exit_code: number | null;
+  restart_count: number;
+  oom_killed: boolean;
+  log_tail: string;
+  findings: HealthFinding[];
+  rollback?: { backup_id: number; recommendation: string; endpoint: string };
 }
