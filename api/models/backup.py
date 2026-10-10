@@ -25,8 +25,12 @@ class Backup(SQLModel, table=True):
     memory: str
     jvm_flags: str
 
+    # Installed-mod rows at backup time, so a restore can put the DB back in
+    # sync with the mod jars inside the archive (the files alone aren't enough).
+    mods_json: str = "[]"
+
     filename: str  # relative to settings.backups_dir
     size_bytes: int
-    kind: str = "manual"  # manual | scheduled | pre_restore
+    kind: str = "manual"  # manual | scheduled | pre_restore | pre_upgrade
     note: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

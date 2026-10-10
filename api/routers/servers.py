@@ -5,7 +5,16 @@ from sqlmodel import Session
 from api.clients.rcon import RconError
 from api.db import SessionDep
 from api.models.instance import InstanceCreate, InstanceRead, ServerInstance
-from api.services import console, docker_manager, instances, mc_config, players, provision, setup
+from api.services import (
+    console,
+    docker_manager,
+    instances,
+    mc_config,
+    players,
+    provision,
+    setup,
+    upgrades,
+)
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -212,6 +221,62 @@ def set_extra_ports(instance_id: int, ports: list[ExtraPort], session: SessionDe
     return {"extra_ports": [p.model_dump() for p in ports]}
 
 
+class UpgradeRequest(BaseModel):
+    mc_version: str = upgrades.LATEST  # "latest" -> current release
+    loader_version: str | None = None  # None -> newest stable for the target
+    memory: str | None = None  # take the chance to resize the heap
+    disable_incompatible: bool = False  # upgrade anyway, turning blockers off
+
+
+@router.post("/{instance_id}/upgrade/preflight")
+def upgrade_preflight(instance_id: int, body: UpgradeRequest, session: SessionDep) -> dict:
+    """Dry run: target version, Java change, and per-mod compatibility.
+    Changes nothing — call it before /upgrade and show the user the plan."""
+    instance = _get_or_404(session, instance_id)
+    return upgrades.preflight(session, instance, body.mc_version, body.loader_version)
+
+
+@router.post("/{instance_id}/upgrade")
+def upgrade_server(instance_id: int, body: UpgradeRequest, session: SessionDep) -> dict:
+    """Upgrade to a new MC version. Always takes a pre_upgrade backup first and
+    leaves the server stopped — follow with /health-check to boot and verify.
+
+    Slow (backup + downloads + possibly an image build); expect minutes.
+    """
+    instance = _get_or_404(session, instance_id)
+    try:
+        return upgrades.upgrade(
+            session,
+            instance,
+            body.mc_version,
+            loader_version=body.loader_version,
+            memory=body.memory,
+            disable_incompatible=body.disable_incompatible,
+        )
+    except upgrades.UpgradeBlockedError as e:
+        raise HTTPException(409, detail={"message": str(e), "preflight": e.report}) from e
+    except upgrades.UpgradeError as e:
+        raise HTTPException(500, str(e)) from e
+    except ValueError as e:  # bad memory string
+        raise HTTPException(422, str(e)) from e
+
+
+class HealthCheckRequest(BaseModel):
+    timeout: int = Field(default=upgrades.HEALTH_TIMEOUT, ge=10, le=900)
+    rollback_backup_id: int | None = None  # include rollback advice if it fails
+
+
+@router.post("/{instance_id}/health-check")
+def health_check(instance_id: int, body: HealthCheckRequest, session: SessionDep) -> dict:
+    """Start the server and watch until it reports Done, crashes, or times out.
+    On failure, returns findings + recommended next steps. Blocks for up to
+    `timeout` seconds."""
+    instance = _get_or_404(session, instance_id)
+    return upgrades.health_check(
+        session, instance, timeout=body.timeout, rollback_backup_id=body.rollback_backup_id
+    )
+
+
 class CommandBody(BaseModel):
     command: str
 
@@ -230,9 +295,7 @@ def run_command(instance_id: int, body: CommandBody, session: SessionDep) -> dic
 
 
 @router.websocket("/{instance_id}/console")
-async def console_ws(
-    websocket: WebSocket, instance_id: int, session: SessionDep, tail: int = 100
-):
+async def console_ws(websocket: WebSocket, instance_id: int, session: SessionDep, tail: int = 100):
     """Interactive console: streams stdout/stderr, sends typed lines to stdin.
     ?tail= controls how much log history is replayed on connect (0 = none)."""
     await websocket.accept()

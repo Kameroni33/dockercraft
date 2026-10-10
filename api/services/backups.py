@@ -5,6 +5,7 @@ then always re-enable autosave. Archives live under data/backups/<instance>/ and
 exclude logs/. Retention pruning only ever deletes scheduled/pre_restore backups.
 """
 
+import json
 import shutil
 import tarfile
 from datetime import UTC, datetime, timedelta
@@ -16,11 +17,46 @@ from api import paths
 from api.config import settings
 from api.models.backup import Backup
 from api.models.instance import InstanceCreate, Loader, ServerInstance
+from api.models.mod import InstalledMod
 from api.services import console, docker_manager, instances
 
 EXCLUDE = {"logs"}  # top-level instance-dir entries left out of archives
 SAVE_TIMEOUT = 120  # save-all flush can take a while on big worlds
+# pre_upgrade is deliberately absent: a version rollback point outlives retention.
 PRUNABLE_KINDS = ("scheduled", "pre_restore")
+
+# InstalledMod fields carried in Backup.mods_json (id/instance_id are re-assigned).
+MOD_SNAPSHOT_FIELDS = (
+    "project_id",
+    "slug",
+    "title",
+    "version_id",
+    "version_number",
+    "filename",
+    "enabled",
+    "auto_update",
+    "dependency_of",
+    "requires_json",
+)
+
+
+def _snapshot_mods(session: Session, instance: ServerInstance) -> str:
+    rows = session.exec(select(InstalledMod).where(InstalledMod.instance_id == instance.id)).all()
+    return json.dumps([{f: getattr(m, f) for f in MOD_SNAPSHOT_FIELDS} for m in rows])
+
+
+def _restore_mods(session: Session, backup: Backup, instance: ServerInstance) -> int:
+    """Replace the instance's mod rows with the backup's snapshot. The jars
+    themselves come back with the archive; this re-syncs the DB to them."""
+    for stale in session.exec(
+        select(InstalledMod).where(InstalledMod.instance_id == instance.id)
+    ).all():
+        session.delete(stale)
+    snapshot = json.loads(backup.mods_json or "[]")
+    for row in snapshot:
+        session.add(InstalledMod(instance_id=instance.id, **row))
+    session.commit()
+    return len(snapshot)
 
 
 def backup_path(backup: Backup) -> Path:
@@ -64,6 +100,7 @@ def create_backup(
         server_jar=instance.server_jar,
         memory=instance.memory,
         jvm_flags=instance.jvm_flags,
+        mods_json=_snapshot_mods(session, instance),
         filename=str(archive.relative_to(settings.backups_dir)),
         size_bytes=archive.stat().st_size,
         kind=kind,
@@ -134,6 +171,7 @@ def restore_backup(session: Session, backup: Backup, instance: ServerInstance) -
     instance.server_jar = backup.server_jar
     session.add(instance)
     session.commit()
+    _restore_mods(session, backup, instance)
 
     # Config (image/env) may have changed with the snapshot — rebuild container.
     docker_manager.remove_container(instance)
@@ -163,6 +201,8 @@ def clone_backup(session: Session, backup: Backup, name: str) -> ServerInstance:
     session.commit()
     session.refresh(instance)
     extract_backup(backup, paths.instance_dir(instance.name))
+    _restore_mods(session, backup, instance)  # jars came with the archive
+    session.refresh(instance)  # the mod commit expired it; un-expire before dump
     # Old rcon.password sits in the extracted server.properties; apply_managed
     # re-asserts the new instance's secrets before every start.
     return instance

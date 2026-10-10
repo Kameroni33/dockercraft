@@ -30,6 +30,7 @@ def heap_bytes(memory: str) -> int:
     n, unit = int(m.group(1)), m.group(2).lower()
     return n * (1024**3 if unit == "g" else 1024**2)
 
+
 _client: docker.DockerClient | None = None
 
 
@@ -108,6 +109,41 @@ def status(instance: ServerInstance) -> str:
     """Docker container status, or "not_created" if no container exists yet."""
     container = get_container(instance)
     return container.status if container else "not_created"
+
+
+def state(instance: ServerInstance) -> dict:
+    """Raw container state: {status, exit_code, restarting, restart_count, oom}.
+
+    Richer than status() on purpose — containers run with restart_policy
+    unless-stopped, so a crash LOOP still reports status "running". Only
+    restart_count/exit_code distinguish a healthy server from a flapping one.
+    """
+    container = get_container(instance)
+    if container is None:
+        return {
+            "status": "not_created",
+            "exit_code": None,
+            "restarting": False,
+            "restart_count": 0,
+            "oom_killed": False,
+        }
+    container.reload()
+    s = container.attrs.get("State", {})
+    return {
+        "status": container.status,
+        "exit_code": s.get("ExitCode"),
+        "restarting": bool(s.get("Restarting")),
+        "restart_count": int(container.attrs.get("RestartCount", 0)),
+        "oom_killed": bool(s.get("OOMKilled")),
+    }
+
+
+def logs(instance: ServerInstance, tail: int = 200) -> str:
+    """Recent container output (stdout+stderr), empty if there's no container."""
+    container = get_container(instance)
+    if container is None:
+        return ""
+    return container.logs(tail=tail).decode(errors="replace")
 
 
 def start(instance: ServerInstance) -> None:
